@@ -42,11 +42,14 @@ int test_send(uint8_t *packet, int size)
 
 int main()
 {
+	printf("test start\n");
+
 	if(h264_reader_open("test.h264") < 0)
 	{
 		printf("open h264 failed\n");
 		return -1;
 	}
+	printf("open h264 success\n");
 
 	H264NALU nalu;
 	uint16_t seq = 100;

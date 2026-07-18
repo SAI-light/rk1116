@@ -89,7 +89,7 @@ int h264_reader_read(H264NALU *nalu)
 
 	nalu->type = nalu->data[0]&0x1f;
 
-	return 0;
+	return 1;
 }
 
 void h264_reader_close()
