@@ -12,20 +12,17 @@ static int find_start_code(uint8_t *buf, int size)
 
 	for(i = 0; i < size - 3; i++)
 	{
-		if(buf[i] == 0x00 && buf[i+1] == 0x00)
+		if(buf[i] == 0x00 && buf[i+1] == 0x00 && buf[i+2] == 0x01)
 		{
-			if(buf[i+2] == 0x01)
-			{
-				return 3;
-			}
+			return i;
+		}
 
-			if(i < size-4 && buf[i+2] == 0x00 && buf[i+3] == 0x01)
-			{
-				return 4;
-			}
+		if(i < size-4 && buf[i] == 0x00 && buf[i+1] == 0x00 && buf[i+2] == 0x00 && buf[i+3] == 0x01)
+		{
+			return i;
 		}
 	}
-	return 0;
+	return -1;
 }
 
 int h264_reader_open(const char *filename)
@@ -59,19 +56,30 @@ int h264_reader_read(H264NALU *nalu)
 	}
 
 	/* 第一个start code */
-	int start_len = find_start_code(buffer,len);
+	int start = find_start_code(buffer,len);
 
-	if(start_len == 0)
+	if(start < 0)
 		return -1;
 
-	int nalu_start = start_len;
+	int start_len;
+
+	if(buffer[start+2] == 0x01)
+	{
+		start_len = 3;
+	}
+	else
+	{
+		start_len = 4;
+	}
+
+	int nalu_start = start + start_len;
 
 	/* 找下一个NALU */
 	int next = find_start_code(buffer+nalu_start, len-nalu_start);
 
 	int nalu_size;
 
-	if(next > 0)
+	if(next >= 0)
 	{
 		nalu_size = next;
 	}
