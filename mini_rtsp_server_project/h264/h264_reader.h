@@ -12,10 +12,17 @@ typedef struct
 	int      type;     // NALU类型
 }H264NALU;
 
-int h264_reader_open(const char *filename);
+typedef struct
+{
+	uint8_t *buffer;
+	int size;
+	int pos;
+}H264Reader;
 
-int h264_reader_read(H264NALU *nalu);
+H264Reader *h264_reader_open(const char *filename);
 
-void h264_reader_close();
+int h264_reader_read(H264Reader *reader, H264NALU *nalu);
+
+void h264_reader_close(H264Reader *reader);
 
 #endif

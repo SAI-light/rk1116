@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static FILE *h264_fp = NULL;
-
 static int find_start_code(uint8_t *buf, int size)
 {
 	int i;
@@ -25,41 +23,64 @@ static int find_start_code(uint8_t *buf, int size)
 	return -1;
 }
 
-int h264_reader_open(const char *filename)
+H264Reader *h264_reader_open(const char *filename)
 {
-	h264_fp = fopen(filename,"rb");
+	FILE *fp=fopen(filename,"rb");
 
-	if(h264_fp == NULL)
+	if(fp == NULL)
 	{
 		perror("fopen h264");
-		return -1;
+		return NULL;
 	}
 
-	return 0;
+	fseek(fp,0,SEEK_END);
+	int size=ftell(fp);
+	fseek(fp,0,SEEK_SET);
+
+	H264Reader *reader= malloc(sizeof(H264Reader));
+
+	if(reader==NULL)
+	{
+		fclose(fp);
+		return NULL;
+	}
+
+	reader->buffer = malloc(size);
+	if(reader->buffer==NULL)
+	{
+		free(reader);
+		fclose(fp);
+		return NULL;
+	}
+
+	fread(reader->buffer,1,size,fp);
+	fclose(fp);
+
+	reader->size=size;
+	reader->pos=0;
+
+	return reader;
 }
 
-int h264_reader_read(H264NALU *nalu)
+int h264_reader_read(H264Reader *reader, H264NALU *nalu)
 {
-	static uint8_t buffer[MAX_NALU_SIZE];
-
-	int len;
-
-	if(h264_fp == NULL)
+	if(reader == NULL)
 		return -1;
 
-	/* 读取一块数据 */
-	len = fread(buffer,1,sizeof(buffer),h264_fp);
+	if(reader->pos >= reader->size)
+		return 0;
 
-	if(len <= 0)
-	{
-		return -1;
-	}
+	uint8_t *buffer= reader->buffer;
+
+	int remain = reader->size-reader->pos;
 
 	/* 第一个start code */
-	int start = find_start_code(buffer,len);
+	int start = find_start_code(buffer+reader->pos, remain);
 
 	if(start < 0)
-		return -1;
+		return 0;
+
+	start += reader->pos;
 
 	int start_len;
 
@@ -75,36 +96,38 @@ int h264_reader_read(H264NALU *nalu)
 	int nalu_start = start + start_len;
 
 	/* 找下一个NALU */
-	int next = find_start_code(buffer+nalu_start, len-nalu_start);
+	int next = find_start_code(buffer+nalu_start, reader->size-nalu_start);
 
-	int nalu_size;
+	int nalu_end;
 
 	if(next >= 0)
 	{
-		nalu_size = next;
+		nalu_end=nalu_start+next;
 	}
 	else
 	{
-		nalu_size = len-nalu_start;
+		nalu_end=reader->size;
 	}
 
-	/* 保存NALU */
+	int nalu_size = nalu_end-nalu_start;
 	nalu->data = malloc(nalu_size);
-
 	memcpy(nalu->data, buffer+nalu_start, nalu_size);
-
 	nalu->size = nalu_size;
-
 	nalu->type = nalu->data[0]&0x1f;
+
+	reader->pos=nalu_end;
+
 
 	return 1;
 }
 
-void h264_reader_close()
+void h264_reader_close(H264Reader *reader)
 {
-	if(h264_fp)
+	if(reader)
 	{
-		fclose(h264_fp);
-		h264_fp=NULL;
+		if(reader->buffer)
+			free(reader->buffer);
+
+		free(reader);
 	}
 }

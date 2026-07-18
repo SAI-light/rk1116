@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 int test_send(uint8_t *packet, int size)
 {
@@ -49,7 +50,11 @@ int main()
 {
 	printf("test start\n");
 
-	if(h264_reader_open("test.h264") < 0)
+	H264Reader *reader;
+
+	reader=h264_reader_open("test.h264");
+
+	if(reader==NULL)
 	{
 		printf("open h264 failed\n");
 		return -1;
@@ -60,14 +65,14 @@ int main()
 	uint16_t seq = 100;
 	uint32_t timestamp = 90000;
 
-	while(h264_reader_read(&nalu) > 0)
+	while(h264_reader_read(reader,&nalu)>0)
 	{
 		printf("\n====================\n");
 		printf("NALU type=%d size=%d\n", nalu.type, nalu.size);
 		h264_rtp_send_nalu(nalu.data, nalu.size, &seq, timestamp, test_send);
-		timestamp += 3600;
+		free(nalu.data);
 	}
 
-	h264_reader_close();
+	h264_reader_close(reader);
 	return 0;
 }
