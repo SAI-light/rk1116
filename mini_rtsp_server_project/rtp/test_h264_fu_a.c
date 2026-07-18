@@ -25,11 +25,11 @@ int test_send(uint8_t *packet, int size)
 	}
 	printf("\n");
 
-	if(size > 14)
+	uint8_t nal_type = packet[12] & 0x1F;
+	if(nal_type == 28)
 	{
-		uint8_t fu_indicator = packet[12];
 		uint8_t fu_header = packet[13];
-		printf("FU-A indicator=0x%02X header=0x%02X\n", fu_indicator, fu_header);
+		printf("FU-A header=0x%02X\n", fu_header);
 
 		if(fu_header & 0x80)
 			printf("Start fragment\n");
@@ -37,6 +37,11 @@ int test_send(uint8_t *packet, int size)
 		if(fu_header & 0x40)
 			printf("End fragment\n");
 	}
+	else
+	{
+		printf("Single NALU type=%d\n", nal_type);
+	}
+
 	return size;
 }
 
