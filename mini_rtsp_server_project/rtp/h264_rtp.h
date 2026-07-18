@@ -23,6 +23,8 @@ typedef int (*rtp_send_callback)(uint8_t *packet, int size);
 
 int h264_rtp_packet(uint8_t *nalu, int nalu_size, uint8_t *packet, uint16_t seq, uint32_t timestamp);
 
+int h264_rtp_packet_ex(uint8_t *nalu, int nalu_size, uint8_t *packet, uint16_t seq, uint32_t timestamp, int marker);
+
 int h264_rtp_fu_a(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t timestamp, rtp_send_callback send);
 
 int h264_rtp_send_nalu(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t timestamp, rtp_send_callback send);

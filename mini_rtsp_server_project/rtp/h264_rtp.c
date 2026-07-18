@@ -28,9 +28,20 @@ int h264_rtp_packet(uint8_t *nalu, int nalu_size, uint8_t *packet, uint16_t seq,
 	RTPHeader header;
 	rtp_header_init(&header, seq, timestamp);
 
+
 	int len = rtp_packet_pack(&header, nalu, nalu_size, packet);
 
 	return len;
+}
+
+int h264_rtp_packet_ex(uint8_t *nalu, int nalu_size, uint8_t *packet, uint16_t seq, uint32_t timestamp, int marker)
+{
+	RTPHeader header;
+	rtp_header_init(&header, seq, timestamp);
+
+	header.marker = marker;
+
+	return rtp_packet_pack(&header, nalu, nalu_size, packet);
 }
 
 int h264_rtp_fu_a(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t timestamp, rtp_send_callback send)
@@ -46,6 +57,13 @@ int h264_rtp_fu_a(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t timestam
 	while(remain > 0)
 	{
 		int payload_size;
+		int marker = 0;
+
+		if(remain <= RTP_PAYLOAD_MAX)
+		{
+			marker = 1;
+		}
+
 		if(remain > RTP_PAYLOAD_MAX)
 		{
 			payload_size = RTP_PAYLOAD_MAX;
@@ -74,6 +92,7 @@ int h264_rtp_fu_a(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t timestam
 
 		RTPHeader header;
 		rtp_header_init(&header, (*seq)++, timestamp);
+		header.marker = marker;
 
 		int packet_len = rtp_packet_pack(&header, fu_payload, payload_size+2, packet);
 		if(send(packet,packet_len)<0)
@@ -93,7 +112,7 @@ int h264_rtp_send_nalu(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t tim
 
 	if(nalu_size <= RTP_PAYLOAD_MAX)
 	{
-		int len = h264_rtp_packet(nalu, nalu_size, packet, (*seq)++, timestamp);
+		int len = h264_rtp_packet_ex(nalu, nalu_size, packet, *seq, timestamp, 0);
 		if(len < 0)
 		{
 			return -1;
