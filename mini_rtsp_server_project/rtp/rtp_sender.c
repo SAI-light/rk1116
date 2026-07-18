@@ -18,46 +18,32 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-static int udp_fd = -1;
-
-static struct sockaddr_in dest_addr;
-
-int rtp_sender_init(const char *ip, int port)
+int rtp_sender_init(RTPSender *sender, const char *ip, int port)
 {
-	udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
-
-	if(udp_fd < 0)
+	memset(sender,0,sizeof(RTPSender));
+	sender->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if(sender->sockfd <0)
 	{
 		perror("socket");
 		return -1;
 	}
 
-	memset(&dest_addr, 0, sizeof(dest_addr));
-	dest_addr.sin_family = AF_INET;
-	dest_addr.sin_port = htons(port);
-
-	if(inet_pton(AF_INET, ip, &dest_addr.sin_addr) <= 0)
-	{
-		perror("inet_pton");
-		return -1;
-	}
-
+	strcpy(sender->ip,ip);
+	sender->port=port;
 	printf("RTP sender init %s:%d\n", ip, port);
 
 	return 0;
 }
 
-int rtp_sender_send(uint8_t *packet, int size)
+int rtp_sender_send(RTPSender *sender, uint8_t *packet, int size)
 {
-	if(udp_fd <0)
-	{
-		return -1;
-	}
+	struct sockaddr_in addr;
+	memset(&addr,0,sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(sender->port);
+	addr.sin_addr.s_addr = inet_addr(sender->ip);
 
-	int ret = sendto(udp_fd, packet, size, 0,
-			(struct sockaddr*)&dest_addr,
-			sizeof(dest_addr));
-
+	int ret = sendto(sender->sockfd, packet, size, 0, (struct sockaddr*)&addr, sizeof(addr));
 	if(ret <0)
 	{
 		perror("sendto");
@@ -67,12 +53,10 @@ int rtp_sender_send(uint8_t *packet, int size)
 	return ret;
 }
 
-void rtp_sender_close()
+void rtp_sender_close(RTPSender *sender)
 {
-	if(udp_fd >=0)
+	if(sender->sockfd>0)
 	{
-		close(udp_fd);
-		udp_fd=-1;
+		close(sender->sockfd);
 	}
 }
-

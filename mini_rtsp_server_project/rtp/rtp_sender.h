@@ -17,14 +17,20 @@
 
 #include <stdint.h>
 
+typedef struct
+{
+	int sockfd;
+	char ip[64];
+	int port;
+}RTPSender;
+
 /* 初始化UDP发送端 VLC客户端IP, VLC接收RTP端口; 返回:0 成功,-1失败 */
-int rtp_sender_init(const char *ip, int port);
+int rtp_sender_init(RTPSender *sender, const char *ip, int port);
 
 /* 发送RTP数据包 */
-int rtp_sender_send(uint8_t *packet, int size);
+int rtp_sender_send(RTPSender *sender, uint8_t *packet, int size);
 
-/* 关闭socket */
-void rtp_sender_close();
+void rtp_sender_close(RTPSender *sender);
 
 #endif
 
