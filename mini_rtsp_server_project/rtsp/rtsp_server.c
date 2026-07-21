@@ -13,6 +13,7 @@
 
 #include "rtsp_server.h"
 #include "rtsp_session.h"
+#include "rtsp_media.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,15 +92,18 @@ static void handle_setup(int client_fd, RTSPSession *session, char *request)
 	send_response(client_fd,response);
 }
 
-static void handle_play(int client_fd)
+static void handle_play(int client_fd, RTSPSession *session)
 {
+	rtsp_media_start(session);
 	char response[512];
 	snprintf(response,
 			sizeof(response),
 			"RTSP/1.0 200 OK\r\n"
 			"CSeq: 4\r\n"
-			"Session: 12345678\r\n"
-			"\r\n");
+			"Session: %d\r\n"
+			"\r\n",
+			session->session_id
+			);
 
 	send_response(client_fd,response);
 	printf("PLAY received\n");
@@ -125,7 +129,7 @@ static void process_request(int client_fd,char *request, RTSPSession *session)
 	else if(strncmp(request,"PLAY",4)==0)
 	{
 		printf("PLAY\n");
-		handle_play(client_fd);
+		handle_play(client_fd, session);
 	}
 }
 

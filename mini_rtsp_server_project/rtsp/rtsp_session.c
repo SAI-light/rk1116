@@ -18,10 +18,11 @@
 void rtsp_session_init(RTSPSession *session)
 {
 	memset(session,0,sizeof(RTSPSession));
+	session->client_fd=-1;
 	session->session_id = 12345678;
-
 	session->server_rtp_port = 5000;
 	session->server_rtcp_port = 5001;
+	session->playing=0;
 }
 
 int rtsp_session_parse_transport(RTSPSession *session, const char *request)

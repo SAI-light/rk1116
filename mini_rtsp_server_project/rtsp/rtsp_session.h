@@ -25,6 +25,7 @@ typedef struct
 	int server_rtp_port;
 	int server_rtcp_port;
 	uint32_t session_id;
+	int playing;
 }RTSPSession;
 
 void rtsp_session_init(RTSPSession *session);
