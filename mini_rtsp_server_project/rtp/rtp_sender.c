@@ -22,6 +22,7 @@ int rtp_sender_init(RTPSender *sender, const char *ip, int port)
 {
 	memset(sender,0,sizeof(RTPSender));
 	sender->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	printf("sockfd=%d\n",sender->sockfd);
 	if(sender->sockfd <0)
 	{
 		perror("socket");
@@ -37,6 +38,7 @@ int rtp_sender_init(RTPSender *sender, const char *ip, int port)
 
 int rtp_sender_send(RTPSender *sender, uint8_t *packet, int size)
 {
+	printf("rtp_sender_send enter\n");
 	struct sockaddr_in addr;
 	memset(&addr,0,sizeof(addr));
 	addr.sin_family = AF_INET;
@@ -44,6 +46,14 @@ int rtp_sender_send(RTPSender *sender, uint8_t *packet, int size)
 	addr.sin_addr.s_addr = inet_addr(sender->ip);
 
 	int ret = sendto(sender->sockfd, packet, size, 0, (struct sockaddr*)&addr, sizeof(addr));
+	printf(
+			"sendto ret=%d size=%d ip=%s port=%d\n",
+			ret,
+			size,
+			sender->ip,
+			sender->port
+		  );
+
 	if(ret <0)
 	{
 		perror("sendto");

@@ -89,6 +89,7 @@ static void handle_setup(int client_fd, RTSPSession *session, char *request)
 {
 	char response[512];
 	rtsp_session_parse_transport(session, request);
+	strcpy(session->client_ip,"127.0.0.1");
 
 	snprintf(response,
 			sizeof(response),

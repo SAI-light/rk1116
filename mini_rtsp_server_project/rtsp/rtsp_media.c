@@ -25,6 +25,7 @@ static RTPSender sender;
 
 static int media_send_callback(uint8_t *packet, int size)
 {
+	printf("callback enter size=%d\n",size);
 	return rtp_sender_send(&sender, packet, size);
 }
 
