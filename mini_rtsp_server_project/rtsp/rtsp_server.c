@@ -24,25 +24,41 @@
 
 #define BUFFER_SIZE 4096
 
+static int get_cseq(char *request)
+{
+	char *p = strstr(request,"CSeq:");
+	if (p==NULL)
+	{
+		return -1;
+	}
+
+	int cseq;
+	sscanf(p,"CSeq: %d",&cseq);
+	return cseq;
+}
+
 static void send_response(int client_fd, const char *response)
 {
 	send(client_fd, response, strlen(response),0);
 }
 
-static void handle_options(int client_fd)
+static void handle_options(int client_fd, char *request)
 {
 	char response[512];
+	int cseq=get_cseq(request);
 	snprintf(response,
 			sizeof(response),
 			"RTSP/1.0 200 OK\r\n"
-			"CSeq: 1\r\n"
+			"CSeq: %d\r\n"
 			"Public: OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN\r\n"
-			"\r\n");
+			"\r\n",
+			cseq
+			);
 
 	send_response(client_fd,response);
 }
 
-static void handle_describe(int client_fd)
+static void handle_describe(int client_fd, char *request)
 {
 	char response[2048];
 	const char *sdp =
@@ -57,11 +73,12 @@ static void handle_describe(int client_fd)
 	snprintf(response,
 			sizeof(response),
 			"RTSP/1.0 200 OK\r\n"
-			"CSeq: 2\r\n"
+			"CSeq: %d\r\n"
 			"Content-Type: application/sdp\r\n"
 			"Content-Length: %ld\r\n"
 			"\r\n"
 			"%s",
+			get_cseq(request),
 			strlen(sdp),
 			sdp);
 
@@ -76,12 +93,13 @@ static void handle_setup(int client_fd, RTSPSession *session, char *request)
 	snprintf(response,
 			sizeof(response),
 			"RTSP/1.0 200 OK\r\n"
-			"CSeq: 3\r\n"
+			"CSeq: %d\r\n"
 			"Transport: RTP/AVP;unicast;"
 			"client_port=%d-%d;"
 			"server_port=%d-%d\r\n"
 			"Session: %u\r\n"
 			"\r\n",
+			get_cseq(request),
 			session->client_rtp_port,
 			session->client_rtcp_port,
 			session->server_rtp_port,
@@ -92,16 +110,17 @@ static void handle_setup(int client_fd, RTSPSession *session, char *request)
 	send_response(client_fd,response);
 }
 
-static void handle_play(int client_fd, RTSPSession *session)
+static void handle_play(int client_fd, RTSPSession *session,  char *request)
 {
 	rtsp_media_start(session);
 	char response[512];
 	snprintf(response,
 			sizeof(response),
 			"RTSP/1.0 200 OK\r\n"
-			"CSeq: 4\r\n"
+			"CSeq: %d\r\n"
 			"Session: %d\r\n"
 			"\r\n",
+			get_cseq(request),
 			session->session_id
 			);
 
@@ -114,12 +133,12 @@ static void process_request(int client_fd,char *request, RTSPSession *session)
 	if(strncmp(request,"OPTIONS",7)==0)
 	{
 		printf("OPTIONS\n");
-		handle_options(client_fd);
+		handle_options(client_fd, request);
 	}
 	else if(strncmp(request,"DESCRIBE",8)==0)
 	{
 		printf("DESCRIBE\n");
-		handle_describe(client_fd);
+		handle_describe(client_fd, request);
 	}
 	else if(strncmp(request,"SETUP",5)==0)
 	{
@@ -129,7 +148,7 @@ static void process_request(int client_fd,char *request, RTSPSession *session)
 	else if(strncmp(request,"PLAY",4)==0)
 	{
 		printf("PLAY\n");
-		handle_play(client_fd, session);
+		handle_play(client_fd, session, request);
 	}
 }
 
@@ -169,10 +188,11 @@ int rtsp_server_start(int port)
 		rtsp_session_init(&session);
 		session.client_fd = client_fd;
 
+		char buffer[BUFFER_SIZE];
+		int offset = 0;
+
 		while(1)
 		{
-			char buffer[BUFFER_SIZE];
-			int offset = 0;
 			memset(buffer,0,sizeof(buffer));
 
 			while (1)
