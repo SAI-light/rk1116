@@ -19,7 +19,7 @@ void rtp_header_init(RTPHeader *header, uint16_t seq, uint32_t timestamp)
 {
 	header->version = 2;
 	header->payload_type = 96;
-	header->marker = 1;
+	header->marker = 0;
 	header->sequence = seq;
 	header->timestamp = timestamp;
 	header->ssrc = 0x12345678;

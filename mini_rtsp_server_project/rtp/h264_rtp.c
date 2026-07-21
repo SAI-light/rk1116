@@ -120,6 +120,8 @@ int h264_rtp_send_nalu(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t tim
 
 		send(packet,len);
 
+		(*seq)++;
+
 		return 1;
 	}
 
