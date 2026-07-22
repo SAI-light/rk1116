@@ -23,6 +23,25 @@
 
 static RTPSender sender;
 
+typedef struct
+{
+	RTSPMedia *media;
+	RTSPSession *session;
+}MediaThreadArgs;
+
+int rtsp_media_init(RTSPMedia *media)
+{
+	media->reader = h264_reader_open("test.h264");
+	if(!media->reader)
+	{
+		printf("open h264 failed\n");
+		return -1;
+	}
+	printf("rtsp media init success\n");
+
+	return 0;
+}
+
 static int media_send_callback(uint8_t *packet, int size)
 {
 	printf("callback enter size=%d\n",size);
@@ -31,19 +50,16 @@ static int media_send_callback(uint8_t *packet, int size)
 
 static void *media_thread(void *arg)
 {
-	RTSPSession *session = (RTSPSession *)arg;
+	MediaThreadArgs *args =(MediaThreadArgs *)arg;
+	RTSPMedia *media = args->media;
+	RTSPSession *session = args->session;
+
 	printf("media thread start\n");
+
+	H264Reader *reader = media->reader;
 
 	if(rtp_sender_init(&sender, session->client_ip, session->client_rtp_port) < 0)
 	{
-		return NULL;
-	}
-
-	H264Reader *reader;
-	reader=h264_reader_open( "test.h264");
-	if(!reader)
-	{
-		printf("open h264 failed\n");
 		return NULL;
 	}
 
@@ -67,23 +83,26 @@ static void *media_thread(void *arg)
 		usleep(40000);
 	}
 
-	h264_reader_close(reader);
+	free(args);
 	rtp_sender_close(&sender);
 	return NULL;
 }
 
-int rtsp_media_start(RTSPSession *session)
+int rtsp_media_start(RTSPMedia *media, RTSPSession *session)
 {
 	pthread_t tid;
+	MediaThreadArgs *args = malloc(sizeof(MediaThreadArgs));
+	args->media = media;
+	args->session = session;
 	session->playing=1;
 
-	pthread_create(&tid, NULL, media_thread, session);
+	pthread_create(&tid, NULL, media_thread, args);
 	pthread_detach(tid);
 
 	return 0;
 }
 
-int rtsp_media_stop(RTSPSession *session)
+int rtsp_media_stop(RTSPMedia *media, RTSPSession *session)
 {
 	session->playing=0;
 	return 0;

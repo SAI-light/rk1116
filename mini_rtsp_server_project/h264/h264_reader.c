@@ -23,6 +23,30 @@ static int find_start_code(uint8_t *buf, int size)
 	return -1;
 }
 
+static void h264_reader_parse_parameter(H264Reader *reader)
+{
+	int old_pos=reader->pos;
+	reader->pos=0;
+	H264NALU nalu;
+	while(h264_reader_read(reader,&nalu)>0)
+	{
+		if(nalu.type==7)
+		{
+			reader->sps=malloc(nalu.size);
+			memcpy(reader->sps, nalu.data, nalu.size);
+			reader->sps_size=nalu.size;
+		}
+		if(nalu.type==8)
+		{
+			reader->pps=malloc(nalu.size);
+			memcpy(reader->sps, nalu.data, nalu.size);
+			reader->pps_size=nalu.size;
+		}
+		free(nalu.data);
+	}
+	reader->pos=old_pos;
+}
+
 H264Reader *h264_reader_open(const char *filename)
 {
 	FILE *fp=fopen(filename,"rb");
@@ -56,8 +80,14 @@ H264Reader *h264_reader_open(const char *filename)
 	fread(reader->buffer,1,size,fp);
 	fclose(fp);
 
+	reader->sps=NULL;
+	reader->pps=NULL;
+	reader->sps_size=0;
+	reader->pps_size=0;
 	reader->size=size;
 	reader->pos=0;
+
+	h264_reader_parse_parameter(reader);
 
 	return reader;
 }
@@ -127,6 +157,10 @@ void h264_reader_close(H264Reader *reader)
 	{
 		if(reader->buffer)
 			free(reader->buffer);
+		if(reader->sps)
+			free(reader->sps);
+		if(reader->pps)
+			free(reader->pps);
 
 		free(reader);
 	}

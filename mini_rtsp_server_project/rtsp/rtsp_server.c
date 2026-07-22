@@ -14,6 +14,7 @@
 #include "rtsp_server.h"
 #include "rtsp_session.h"
 #include "rtsp_media.h"
+#include "sdp_builder.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,16 @@ static int get_cseq(char *request)
 	return cseq;
 }
 
+static int check_request_complete(char *buffer)
+{
+	if(strstr(buffer,"\r\n\r\n") || strstr(buffer,"\n\n"))
+	{
+		if(strstr(buffer,"CSeq:"))
+			return 1;
+	}
+	return 0;
+}
+
 static void send_response(int client_fd, const char *response)
 {
 	send(client_fd, response, strlen(response),0);
@@ -58,17 +69,23 @@ static void handle_options(int client_fd, char *request)
 	send_response(client_fd,response);
 }
 
-static void handle_describe(int client_fd, char *request)
+static void handle_describe(int client_fd, char *request, RTSPMedia *media)
 {
 	char response[2048];
-	const char *sdp =
-		"v=0\r\n"
-		"o=- 0 0 IN IP4 0.0.0.0\r\n"
-		"s=Mini RTSP Server\r\n"
-		"t=0 0\r\n"
-		"m=video 0 RTP/AVP 96\r\n"
-		"a=rtpmap:96 H264/90000\r\n"
-		"a=control:track1\r\n";
+
+	char sdp[2048];
+	if(sdp_builder_build(
+				media->reader->sps,
+				media->reader->sps_size,
+				media->reader->pps,
+				media->reader->pps_size,
+				sdp,
+				sizeof(sdp)) < 0)
+	{
+		printf("build sdp failed\n");
+		return;
+	}
+	printf("Generated SDP:\n%s\n", sdp);
 
 	snprintf(response,
 			sizeof(response),
@@ -111,9 +128,9 @@ static void handle_setup(int client_fd, RTSPSession *session, char *request)
 	send_response(client_fd,response);
 }
 
-static void handle_play(int client_fd, RTSPSession *session,  char *request)
+static void handle_play(int client_fd, RTSPMedia *media, RTSPSession *session, char *request)
 {
-	rtsp_media_start(session);
+	rtsp_media_start(media, session);
 	char response[512];
 	snprintf(response,
 			sizeof(response),
@@ -129,8 +146,9 @@ static void handle_play(int client_fd, RTSPSession *session,  char *request)
 	printf("PLAY received\n");
 }
 
-static void process_request(int client_fd,char *request, RTSPSession *session)
+static void process_request(int client_fd,char *request, RTSPSession *session, RTSPMedia *media)
 {
+	printf("process_request enter\n");
 	if(strncmp(request,"OPTIONS",7)==0)
 	{
 		printf("OPTIONS\n");
@@ -139,7 +157,7 @@ static void process_request(int client_fd,char *request, RTSPSession *session)
 	else if(strncmp(request,"DESCRIBE",8)==0)
 	{
 		printf("DESCRIBE\n");
-		handle_describe(client_fd, request);
+		handle_describe(client_fd, request, media);
 	}
 	else if(strncmp(request,"SETUP",5)==0)
 	{
@@ -149,7 +167,7 @@ static void process_request(int client_fd,char *request, RTSPSession *session)
 	else if(strncmp(request,"PLAY",4)==0)
 	{
 		printf("PLAY\n");
-		handle_play(client_fd, session, request);
+		handle_play(client_fd, media, session, request);
 	}
 }
 
@@ -176,6 +194,12 @@ int rtsp_server_start(int port)
 	}
 	listen(server_fd,5);
 	printf("RTSP server listen %d\n",port);
+
+	RTSPMedia media;
+	if(rtsp_media_init(&media)<0)
+	{
+		return -1;
+	}
 
 	while(1)
 	{
@@ -212,9 +236,9 @@ int rtsp_server_start(int port)
 
 				printf("DATA:\n%s\n",buffer);
 
-				if(strstr(buffer,"\r\n\r\n"))
+				if(check_request_complete(buffer))
 				{	
-					process_request(client_fd, buffer, &session);
+					process_request(client_fd, buffer, &session, &media);
 
 					memset(buffer,0,sizeof(buffer));
 					offset=0;

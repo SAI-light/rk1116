@@ -17,6 +17,10 @@ typedef struct
 	uint8_t *buffer;
 	int size;
 	int pos;
+	uint8_t *sps;
+	int sps_size;
+	uint8_t *pps;
+	int pps_size;
 }H264Reader;
 
 H264Reader *h264_reader_open(const char *filename);

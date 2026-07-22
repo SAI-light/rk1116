@@ -15,9 +15,17 @@
 #define RTSP_MEDIA_H
 
 #include "rtsp_session.h"
+#include "h264_reader.h"
 
-int rtsp_media_start(RTSPSession *session);
+typedef struct
+{
+	H264Reader *reader;
+}RTSPMedia;
 
-int rtsp_media_stop(RTSPSession *session);
+int rtsp_media_init(RTSPMedia *media);
+
+int rtsp_media_start(RTSPMedia *media, RTSPSession *session);
+
+int rtsp_media_stop(RTSPMedia *media, RTSPSession *session);
 
 #endif
