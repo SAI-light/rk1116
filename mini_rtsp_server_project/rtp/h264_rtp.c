@@ -112,7 +112,7 @@ int h264_rtp_send_nalu(uint8_t *nalu, int nalu_size, uint16_t *seq, uint32_t tim
 
 	if(nalu_size <= RTP_PAYLOAD_MAX)
 	{
-		int len = h264_rtp_packet_ex(nalu, nalu_size, packet, *seq, timestamp, 0);
+		int len = h264_rtp_packet_ex(nalu, nalu_size, packet, *seq, timestamp, 1);
 		if(len < 0)
 		{
 			return -1;
