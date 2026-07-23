@@ -6,16 +6,14 @@
 
 static int find_start_code(uint8_t *buf, int size)
 {
-	int i;
-
-	for(i = 0; i < size - 3; i++)
+	for(int i=0;i<size-3;i++)
 	{
-		if(buf[i] == 0x00 && buf[i+1] == 0x00 && buf[i+2] == 0x01)
+		if(buf[i]==0x00 && buf[i+1]==0x00 && buf[i+2]==0x00 && buf[i+3]==0x01)
 		{
 			return i;
 		}
 
-		if(i < size-4 && buf[i] == 0x00 && buf[i+1] == 0x00 && buf[i+2] == 0x00 && buf[i+3] == 0x01)
+		if(buf[i]==0x00 && buf[i+1]==0x00 &&  buf[i+2]==0x01)
 		{
 			return i;
 		}
@@ -39,7 +37,7 @@ static void h264_reader_parse_parameter(H264Reader *reader)
 		if(nalu.type==8)
 		{
 			reader->pps=malloc(nalu.size);
-			memcpy(reader->sps, nalu.data, nalu.size);
+			memcpy(reader->pps, nalu.data, nalu.size);
 			reader->pps_size=nalu.size;
 		}
 		free(nalu.data);

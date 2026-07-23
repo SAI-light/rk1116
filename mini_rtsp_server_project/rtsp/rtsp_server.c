@@ -15,6 +15,7 @@
 #include "rtsp_session.h"
 #include "rtsp_media.h"
 #include "sdp_builder.h"
+#include "rtsp_request.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,19 +25,6 @@
 #include <sys/socket.h>
 
 #define BUFFER_SIZE 4096
-
-static int get_cseq(char *request)
-{
-	char *p = strstr(request,"CSeq:");
-	if (p==NULL)
-	{
-		return -1;
-	}
-
-	int cseq;
-	sscanf(p,"CSeq: %d",&cseq);
-	return cseq;
-}
 
 static int check_request_complete(char *buffer)
 {
@@ -50,13 +38,16 @@ static int check_request_complete(char *buffer)
 
 static void send_response(int client_fd, const char *response)
 {
+	printf("====== SEND RESPONSE ======\n");
+	printf("%s\n", response);
+	printf("===========================\n");
 	send(client_fd, response, strlen(response),0);
 }
 
 static void handle_options(int client_fd, char *request)
 {
 	char response[512];
-	int cseq=get_cseq(request);
+	int cseq = rtsp_request_get_cseq(request);
 	snprintf(response,
 			sizeof(response),
 			"RTSP/1.0 200 OK\r\n"
@@ -95,7 +86,7 @@ static void handle_describe(int client_fd, char *request, RTSPMedia *media)
 			"Content-Length: %ld\r\n"
 			"\r\n"
 			"%s",
-			get_cseq(request),
+			rtsp_request_get_cseq(request),
 			strlen(sdp),
 			sdp);
 
@@ -117,7 +108,7 @@ static void handle_setup(int client_fd, RTSPSession *session, char *request)
 			"server_port=%d-%d\r\n"
 			"Session: %u\r\n"
 			"\r\n",
-			get_cseq(request),
+			rtsp_request_get_cseq(request),
 			session->client_rtp_port,
 			session->client_rtcp_port,
 			session->server_rtp_port,
@@ -138,7 +129,7 @@ static void handle_play(int client_fd, RTSPMedia *media, RTSPSession *session, c
 			"CSeq: %d\r\n"
 			"Session: %d\r\n"
 			"\r\n",
-			get_cseq(request),
+			rtsp_request_get_cseq(request),
 			session->session_id
 			);
 
@@ -236,7 +227,8 @@ int rtsp_server_start(int port)
 
 				printf("DATA:\n%s\n",buffer);
 
-				if(check_request_complete(buffer))
+				//if(check_request_complete(buffer))
+				if(rtsp_request_complete(buffer))
 				{	
 					process_request(client_fd, buffer, &session, &media);
 

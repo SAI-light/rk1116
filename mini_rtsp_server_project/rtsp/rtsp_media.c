@@ -71,8 +71,14 @@ static void *media_thread(void *arg)
 		H264NALU nalu;
 		if(h264_reader_read(reader, &nalu)<=0)
 		{
-			printf("end h264 file\n");
-			break;
+			printf("loop h264 file\n");
+			h264_reader_close(reader);
+			reader = h264_reader_open("test.h264");
+			if(reader == NULL)
+			{
+				break;
+			}
+			continue;
 		}
 		printf("send nalu type=%d size=%d\n", nalu.type, nalu.size);
 
