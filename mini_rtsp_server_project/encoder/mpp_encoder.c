@@ -36,6 +36,13 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 		return -1;
 	}
 
+	ret = mpp_buffer_group_get_internal(&encoder->group, MPP_BUFFER_TYPE_NORMAL);
+	if(ret != MPP_OK)
+	{
+		printf("mpp buffer group init failed\n");
+		return -1;
+	}
+
 	MppEncCfg cfg;
 	mpp_enc_cfg_init(&cfg);
 
@@ -68,6 +75,12 @@ void mpp_encoder_close(MppEncoder *encoder)
 {
 	if(encoder == NULL)
 		return;
+
+	if(encoder->group)
+	{
+		mpp_buffer_group_put(encoder->group);
+		encoder->group=NULL;
+	}
 
 	if(encoder->ctx)
 	{

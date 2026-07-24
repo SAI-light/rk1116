@@ -25,6 +25,7 @@ typedef struct
 {
 	MppCtx ctx;
 	MppApi *mpi;
+	MppBufferGroup group;
 	int width;
 	int height;
 }MppEncoder;
