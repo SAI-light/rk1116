@@ -56,6 +56,8 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 	MppEncCfg cfg;
 	mpp_enc_cfg_init(&cfg);
 
+	mpp_enc_cfg_set_s32(cfg, "codec:type", MPP_VIDEO_CodingAVC);
+
 	mpp_enc_cfg_set_s32(cfg, "prep:width", width);
 	mpp_enc_cfg_set_s32(cfg, "prep:height", height);
 	mpp_enc_cfg_set_s32(cfg, "prep:hor_stride", width);
@@ -68,6 +70,10 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 	mpp_enc_cfg_set_s32(cfg, "rc:bps_min",1000000);
 
 	mpp_enc_cfg_set_s32(cfg, "rc:gop", 30);
+	mpp_enc_cfg_set_s32(cfg, "rc:fps_in_num", 30);
+	mpp_enc_cfg_set_s32(cfg, "rc:fps_in_denorm",	1);
+	mpp_enc_cfg_set_s32(cfg, "rc:fps_out_num", 30);
+	mpp_enc_cfg_set_s32(cfg, "rc:fps_out_denorm", 1);
 
 	ret = encoder->mpi->control(encoder->ctx, MPP_ENC_SET_CFG, cfg);
 	if(ret != MPP_OK)
@@ -83,6 +89,8 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 
 int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **out)
 {
+	printf("input nv12 size=%d\n", size);
+
 	MPP_RET ret;
 	MppBuffer buffer;
 	ret = mpp_buffer_get(encoder->group, &buffer, size);
@@ -95,6 +103,13 @@ int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **o
 
 	void *ptr = mpp_buffer_get_ptr(buffer);
 	memcpy(ptr,nv12,size);
+	//ret = mpp_buffer_write(buffer, 0, nv12, size);
+
+	if(ret != MPP_OK)
+	{
+		    printf("mpp_buffer_write failed ret=%d\n", ret);
+			return -1;
+	}
 
 	MppFrame frame;
 	mpp_frame_init(&frame);
@@ -106,16 +121,10 @@ int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **o
 	mpp_frame_set_fmt(frame, MPP_FMT_YUV420SP);
 	mpp_frame_set_pts(frame, 0);
 	mpp_frame_set_eos(frame, 0);
+	mpp_frame_set_buf_size(frame,size);
 	mpp_frame_set_buffer(frame, buffer);
 
 	ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
-
-	MppFrame eos_frame;
-	mpp_frame_init(&eos_frame);
-	mpp_frame_set_eos(eos_frame, 1);
-	ret = encoder->mpi->encode_put_frame(encoder->ctx, eos_frame);
-	printf("send eos frame ret=%d\n", ret);
-	mpp_frame_deinit(&eos_frame);
 
 	MppPacket packet=NULL;
 
