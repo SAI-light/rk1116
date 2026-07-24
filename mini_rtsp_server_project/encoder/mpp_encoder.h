@@ -17,6 +17,9 @@
 #include <stdint.h>
 
 #include "rockchip/rk_mpi.h"
+#include "rockchip/mpp_buffer.h"
+#include "rockchip/mpp_frame.h"
+#include "rockchip/mpp_packet.h"
 
 typedef struct
 {
@@ -24,12 +27,12 @@ typedef struct
 	MppApi *mpi;
 	int width;
 	int height;
-}MPPEncoder;
+}MppEncoder;
 
-int mpp_encoder_init(MPPEncoder *encoder, int width, int height);
+int mpp_encoder_init(MppEncoder *encoder, int width, int height);
 
-int mpp_encoder_encode(MPPEncoder *encoder, uint8_t *nv12, int size, uint8_t **h264, int *h264_size);
+int mpp_encoder_encode(MppEncoder *encoder, void *nv12, int size, void **out, int *out_size);
 
-void mpp_encoder_close(MPPEncoder *encoder);
+void mpp_encoder_close(MppEncoder *encoder);
 
 #endif

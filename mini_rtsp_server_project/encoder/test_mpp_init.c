@@ -20,6 +20,7 @@ int main()
 	MPPEncoder encoder;
 	if(mpp_encoder_init(&encoder, 2304, 1296)<0)
 	{
+		printf("encoder init failed\n");
 		return -1;
 	}
 	printf("test success\n");
