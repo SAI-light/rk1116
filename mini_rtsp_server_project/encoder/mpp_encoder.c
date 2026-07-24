@@ -68,8 +68,6 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 	mpp_enc_cfg_set_s32(cfg, "rc:bps_min",1000000);
 
 	mpp_enc_cfg_set_s32(cfg, "rc:gop", 30);
-	mpp_enc_cfg_set_s32(cfg, "codec:profile", 100);
-	mpp_enc_cfg_set_s32(cfg, "codec:level", 40);
 
 	ret = encoder->mpi->control(encoder->ctx, MPP_ENC_SET_CFG, cfg);
 	if(ret != MPP_OK)
@@ -106,26 +104,29 @@ int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **o
 	mpp_frame_set_hor_stride(frame, encoder->width);
 	mpp_frame_set_ver_stride(frame, encoder->height);
 	mpp_frame_set_fmt(frame, MPP_FMT_YUV420SP);
-	mpp_frame_set_buffer(frame, buffer);
 	mpp_frame_set_pts(frame, 0);
 	mpp_frame_set_eos(frame, 0);
+	mpp_frame_set_buffer(frame, buffer);
 
 	ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
-	if(ret != MPP_OK)
-	{
-		printf("encode_put_frame failed\n");
-		return -1;
-	}
+
+	MppFrame eos_frame;
+	mpp_frame_init(&eos_frame);
+	mpp_frame_set_eos(eos_frame, 1);
+	ret = encoder->mpi->encode_put_frame(encoder->ctx, eos_frame);
+	printf("send eos frame ret=%d\n", ret);
+	mpp_frame_deinit(&eos_frame);
 
 	MppPacket packet=NULL;
+
 	for(int i=0;i<100;i++)
 	{
 		ret = encoder->mpi->encode_get_packet(encoder->ctx, &packet);
-		printf("encode_get_packet try=%d ret=%d packet=%p\n", i, ret, packet);
+		printf("packet poll %d ret=%d packet=%p\n", i, ret, packet);
 		if(packet)
 			break;
 
-		usleep(50000);
+		usleep(10000);
 	}
 	if(packet==NULL)
 	{
