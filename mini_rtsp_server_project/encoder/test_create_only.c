@@ -2,28 +2,27 @@
  *      Copyright:  (C) 2026 Zuo Caimei<zuocaimei@gmail.com>
  *                  All rights reserved.
  *
- *       Filename:  test_mpp_init.c
+ *       Filename:  test_create_only.c
  *    Description:  This file 
  *                 
- *        Version:  1.0.0(07/23/2026)
+ *        Version:  1.0.0(07/24/2026)
  *         Author:  Zuo Caimei <zuocaimei@gmail.com>
- *      ChangeLog:  1, Release initial version on "07/23/2026 11:08:53 PM"
+ *      ChangeLog:  1, Release initial version on "07/24/2026 03:32:48 PM"
  *                 
  ********************************************************************************/
 
-#include "mpp_encoder.h"
-
 #include <stdio.h>
+#include "rockchip/rk_mpi.h"
+
 
 int main()
 {
-	MppEncoder encoder;
-	if(mpp_encoder_init(&encoder, 2304, 1296)<0)
-	{
-		printf("encoder init failed\n");
-		return -1;
-	}
-	printf("test success\n");
-	mpp_encoder_close(&encoder);
+	MppCtx ctx = NULL;
+	MppApi *mpi = NULL;
+
+	MPP_RET ret;
+	ret = mpp_create(&ctx, &mpi);
+
+	printf("mpp_create ret=%d ctx=%p mpi=%p\n", ret, ctx, mpi);
 	return 0;
 }

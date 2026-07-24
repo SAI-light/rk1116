@@ -12,6 +12,8 @@
  ********************************************************************************/
 
 #include "mpp_encoder.h"
+#include "rockchip/rk_venc_cfg.h"
+#include "rockchip/rk_venc_rc.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -19,11 +21,18 @@
 
 int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 {
+	printf("encoder ptr=%p\n",encoder);
+
 	memset(encoder,0,sizeof(*encoder));
+
+	printf("before mpp_create\n");
+
 	encoder->width = width;
 	encoder->height = height;
 
 	MPP_RET ret;
+	ret=mpp_create(&encoder->ctx,&encoder->mpi);
+	if(ret != MPP_OK)
 	{
 		printf("mpp_create failed\n");
 		return -1;
