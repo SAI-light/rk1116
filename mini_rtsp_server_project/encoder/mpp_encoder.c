@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 {
@@ -78,6 +79,73 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 	mpp_enc_cfg_deinit(cfg);
 	printf("MPP encoder init success\n");
 	return 0;
+}
+
+int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **out)
+{
+	MPP_RET ret;
+	MppBuffer buffer;
+	ret = mpp_buffer_get(encoder->group, &buffer, size);
+	printf("encode_put_frame ret=%d\n", ret);
+	if(ret != MPP_OK)
+	{
+		printf("mpp_buffer_get failed\n");
+		return -1;
+	}
+
+	void *ptr = mpp_buffer_get_ptr(buffer);
+	memcpy(ptr,nv12,size);
+
+	MppFrame frame;
+	mpp_frame_init(&frame);
+
+	mpp_frame_set_width(frame, encoder->width);
+	mpp_frame_set_height(frame, encoder->height);
+	mpp_frame_set_hor_stride(frame, encoder->width);
+	mpp_frame_set_ver_stride(frame, encoder->height);
+	mpp_frame_set_fmt(frame, MPP_FMT_YUV420SP);
+	mpp_frame_set_buffer(frame, buffer);
+	mpp_frame_set_pts(frame, 0);
+	mpp_frame_set_eos(frame, 1);
+
+	ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
+	if(ret != MPP_OK)
+	{
+		printf("encode_put_frame failed\n");
+		return -1;
+	}
+
+	MppPacket packet=NULL;
+	for(int i=0;i<100;i++)
+	{
+		ret = encoder->mpi->encode_get_packet(encoder->ctx, &packet);
+		printf("encode_get_packet try=%d ret=%d packet=%p\n", i, ret, packet);
+		if(packet)
+			break;
+
+		usleep(10000);
+	}
+	if(packet==NULL)
+	{
+		printf("no packet output\n");
+		return -1;
+	}
+
+
+	if(ret != MPP_OK || packet==NULL)
+	{
+		printf("encode_get_packet failed\n");
+		return -1;
+	}
+
+	void *data = mpp_packet_get_data(packet);
+	int len = mpp_packet_get_length(packet);
+	*out = malloc(len);
+	memcpy(*out,data,len);
+	printf("encode h264 size=%d\n",len);
+	mpp_packet_deinit(&packet);
+	mpp_buffer_put(buffer);
+	return len;
 }
 
 void mpp_encoder_close(MppEncoder *encoder)

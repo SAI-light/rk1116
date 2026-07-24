@@ -32,7 +32,7 @@ typedef struct
 
 int mpp_encoder_init(MppEncoder *encoder, int width, int height);
 
-int mpp_encoder_encode(MppEncoder *encoder, void *nv12, int size, void **out, int *out_size);
+int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **out);
 
 void mpp_encoder_close(MppEncoder *encoder);
 
