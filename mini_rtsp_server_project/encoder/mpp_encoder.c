@@ -68,6 +68,8 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 	mpp_enc_cfg_set_s32(cfg, "rc:bps_min",1000000);
 
 	mpp_enc_cfg_set_s32(cfg, "rc:gop", 30);
+	mpp_enc_cfg_set_s32(cfg, "codec:profile", 100);
+	mpp_enc_cfg_set_s32(cfg, "codec:level", 40);
 
 	ret = encoder->mpi->control(encoder->ctx, MPP_ENC_SET_CFG, cfg);
 	if(ret != MPP_OK)
@@ -106,7 +108,7 @@ int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **o
 	mpp_frame_set_fmt(frame, MPP_FMT_YUV420SP);
 	mpp_frame_set_buffer(frame, buffer);
 	mpp_frame_set_pts(frame, 0);
-	mpp_frame_set_eos(frame, 1);
+	mpp_frame_set_eos(frame, 0);
 
 	ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
 	if(ret != MPP_OK)
@@ -123,7 +125,7 @@ int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **o
 		if(packet)
 			break;
 
-		usleep(10000);
+		usleep(50000);
 	}
 	if(packet==NULL)
 	{
@@ -145,6 +147,7 @@ int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **o
 	printf("encode h264 size=%d\n",len);
 	mpp_packet_deinit(&packet);
 	mpp_buffer_put(buffer);
+	mpp_frame_deinit(&frame);
 	return len;
 }
 
