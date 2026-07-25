@@ -162,15 +162,7 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 		goto FAIL;
 	}
 
-	ret = mpp_buffer_get(encoder->group, &encoder->pkt_buf, encoder->frame_size);
-	if(ret != MPP_OK)
-	{
-		printf("mpp_buffer_get output packet failed ret=%d\n", ret);
-		goto FAIL;
-	}
-
 	printf("frm_buf=%p size=%zu ptr=%p\n", encoder->frm_buf, mpp_buffer_get_size(encoder->frm_buf), mpp_buffer_get_ptr(encoder->frm_buf));
-	printf("pkt_buf=%p size=%zu ptr=%p\n", encoder->pkt_buf, mpp_buffer_get_size(encoder->pkt_buf), mpp_buffer_get_ptr(encoder->pkt_buf));
 
 	ret = mpp_enc_cfg_init(&cfg);
 	if (ret != MPP_OK || cfg == NULL)
@@ -217,7 +209,7 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 	mpp_enc_cfg_deinit(cfg);
 	cfg = NULL;
 
-	ret = mpp_encoder_get_header(encoder);
+/* 	ret = mpp_encoder_get_header(encoder);
 	printf("mpp_encoder_get_header ret=%d\n", ret);
 	if (ret != 0)
 	{
@@ -230,7 +222,14 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 		}
 		encoder->header_len = 0;
 		encoder->header_pending = 0;
-	}
+	}*/
+	/*
+	 *  * 当前先验证 NV12 能否稳定输出有效的 H264 Packet。
+	 *   * SPS/PPS 单独获取留到下一步处理。
+	 *    */
+	encoder->header_data = NULL;
+	encoder->header_len = 0;
+	encoder->header_pending = 0;
 
 	printf("MPP encoder init success, frame_size=%zu\n", encoder->frame_size); 
 	return 0;
@@ -245,18 +244,13 @@ FAIL:
 
 int mpp_encoder_encode(MppEncoder *encoder, const uint8_t *nv12, int size, uint8_t **out)
 {
-	printf("start encode NV12, input=%d expected=%zu\n", size, encoder->frame_size);
-
 	MPP_RET ret;
 	MppFrame frame = NULL;
 	MppPacket packet = NULL;
-	MppMeta meta = NULL;
-	//uint8_t *packet_mem = NULL;
+	
 	void *frm_ptr;
-	void *pkt_pos;
+	void *pkt_ptr;
 	size_t pkt_len;
-	size_t total_len;
-	size_t prefix_len;
 
 	int result = -1;
 
@@ -268,6 +262,8 @@ int mpp_encoder_encode(MppEncoder *encoder, const uint8_t *nv12, int size, uint8
 	}
 
 	*out = NULL;
+
+	printf("start encode NV12, input=%d expected=%zu\n", size, encoder->frame_size);
 
 	if (size < 0 || (size_t)size < encoder->frame_size)
 	{
@@ -331,7 +327,9 @@ int mpp_encoder_encode(MppEncoder *encoder, const uint8_t *nv12, int size, uint8
 		goto CLEANUP;
 	}*/
 
- 	ret = mpp_packet_init_with_buffer(&packet, encoder->pkt_buf);
+	packet = NULL;
+
+ /* ret = mpp_packet_init_with_buffer(&packet, encoder->pkt_buf);
 	printf("output packet init ret=%d packet=%p\n", ret, packet);
 	if (ret != MPP_OK || packet == NULL)
 	{
@@ -353,7 +351,7 @@ int mpp_encoder_encode(MppEncoder *encoder, const uint8_t *nv12, int size, uint8
 	{
 		printf("mpp_meta_set_packet KEY_OUTPUT_PACKET failed ret=%d\n", ret);
 		goto CLEANUP;
-	}
+	}*/
 
 	ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
 	printf("encode_put_frame ret=%d\n", ret);
@@ -362,57 +360,53 @@ int mpp_encoder_encode(MppEncoder *encoder, const uint8_t *nv12, int size, uint8
 		goto CLEANUP;
 
 	mpp_frame_deinit(&frame);
+	frame = NULL;
 
 	ret = encoder->mpi->encode_get_packet(encoder->ctx, &packet);
 	printf("encode_get_packet ret=%d packet=%p\n", ret, packet);
 	if (ret != MPP_OK || packet == NULL)
+	{
+		frame = NULL;
 		goto CLEANUP;
+	}
 
-	pkt_pos = mpp_packet_get_pos(packet);
+	pkt_ptr = mpp_packet_get_pos(packet);
+	if (pkt_ptr == NULL)
+		pkt_ptr = mpp_packet_get_data(packet);
+
 	pkt_len = mpp_packet_get_length(packet);
-	printf("encoded packet pos=%p len=%zu size=%zu\n", pkt_pos, pkt_len,
-			mpp_packet_get_size(packet));
-
-	if (pkt_pos == NULL || pkt_len == 0)
+	printf("encoded packet ptr=%p len=%zu\n", pkt_ptr, pkt_len);
+	if (pkt_ptr == NULL || pkt_len == 0)
 	{
 		printf("encoded packet is empty\n");
 		goto CLEANUP;
 	}
 
-	prefix_len = encoder->header_pending ? encoder->header_len : 0;
-	total_len = prefix_len + pkt_len;
-
-	*out = malloc(total_len);
+	*out = malloc(pkt_len);
 	if (*out == NULL)
 	{
-		printf("malloc H264 output failed, size=%zu\n", total_len);
+		printf("malloc H264 output failed, size=%zu\n", pkt_len);
 		goto CLEANUP;
 	}
 
-	if (prefix_len > 0)
-	{
-		memcpy(*out, encoder->header_data, prefix_len);
-		encoder->header_pending = 0;
-	}
+	memcpy(*out, pkt_ptr, pkt_len);
 
-	memcpy(*out + prefix_len, pkt_pos, pkt_len);
+	printf("encode H264 success, size=%zu\n", pkt_len);
 
-	printf("encode H264 packet=%zu total_output=%zu\n", pkt_len, total_len);
-	printf("encode_get_packet ret=%d packet=%p\n", ret, packet);
-
-	MppPacket submitted_packet = packet;
-	printf("packet before encode=%p\n", submitted_packet);
-
-	result = (int)total_len;
+	result = (int)pkt_len;
 
 CLEANUP:
 	if (frame != NULL)
+	{
 		mpp_frame_deinit(&frame);
+		frame = NULL;
+	}
 
 	if (packet != NULL)
+	{
 		mpp_packet_deinit(&packet);
-
-	//free(packet_mem);
+		packet = NULL;
+	}
 
 	if (result < 0 && *out != NULL)
 	{
