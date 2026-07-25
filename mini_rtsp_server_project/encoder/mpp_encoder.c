@@ -20,41 +20,137 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static int mpp_encoder_get_header(MppEncoder *encoder)
+{
+	MPP_RET ret;
+	MppPacket packet = NULL;
+	void *pos;
+	size_t len;
+
+	ret = mpp_packet_init_with_buffer(&packet, encoder->pkt_buf);
+	if (ret != MPP_OK || packet == NULL)
+	{
+		printf("mpp_packet_init_with_buffer(header) failed ret=%d\n", ret);
+		return -1;
+	}
+
+	mpp_packet_set_length(packet, 0);
+
+	ret = encoder->mpi->control(encoder->ctx, MPP_ENC_GET_HDR_SYNC, packet);
+	if (ret != MPP_OK)
+	{
+		printf("MPP_ENC_GET_HDR_SYNC failed ret=%d\n", ret);
+		mpp_packet_deinit(&packet);
+		return -1;
+	}
+
+	pos = mpp_packet_get_pos(packet);
+	len = mpp_packet_get_length(packet);
+	if (pos == NULL || len == 0)
+	{
+		printf("MPP H264 header is empty\n");
+		mpp_packet_deinit(&packet);
+		return -1;
+	}
+
+	encoder->header_data = malloc(len);
+	if (encoder->header_data == NULL)
+	{
+		printf("malloc H264 header failed, size=%zu\n", len);
+		mpp_packet_deinit(&packet);
+		return -1;
+	}
+
+	memcpy(encoder->header_data, pos, len);
+	encoder->header_len = len;
+	encoder->header_pending = 1;
+
+	printf("MPP H264 header size=%zu\n", len);
+
+	mpp_packet_deinit(&packet);
+	return 0;
+}
+
 int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 {
-	printf("encoder ptr=%p\n",encoder);
+	MPP_RET ret;
+	MppPollType timeout = MPP_POLL_BLOCK;
+	MppEncCfg cfg = NULL;
+	MppBufferType buffer_type = MPP_BUFFER_TYPE_ION;
 
-	memset(encoder,0,sizeof(*encoder));
+	if (encoder == NULL || width <= 0 || height <= 0)
+	{
+		printf("invalid encoder parameter\n");
+		return -1;
+	}
+
+	memset(encoder, 0, sizeof(*encoder));
+	encoder->width = width;
+	encoder->height = height;
+	encoder->frame_size = (size_t)width * (size_t)height * 3U / 2U;
+
+#ifdef MPP_BUFFER_FLAGS_CACHABLE
+	buffer_type = (MppBufferType)(MPP_BUFFER_TYPE_ION | MPP_BUFFER_FLAGS_CACHABLE);
+#endif
 
 	printf("before mpp_create\n");
 
-	encoder->width = width;
-	encoder->height = height;
-
-	MPP_RET ret;
 	ret=mpp_create(&encoder->ctx,&encoder->mpi);
 	if(ret != MPP_OK)
 	{
-		printf("mpp_create failed\n");
-		return -1;
+		printf("mpp_create failed ret=%d\n", ret);
+		goto FAIL;
+	}
+
+	ret = encoder->mpi->control(encoder->ctx, MPP_SET_OUTPUT_TIMEOUT, &timeout);
+	if(ret != MPP_OK)
+	{
+		printf("MPP_SET_OUTPUT_TIMEOUT failed ret=%d\n", ret);
+		goto FAIL;
 	}
 
 	ret = mpp_init(encoder->ctx, MPP_CTX_ENC, MPP_VIDEO_CodingAVC);
 	if(ret != MPP_OK)
 	{
-		printf("mpp_init failed\n");
-		return -1;
+		printf("mpp_init failed ret=%d\n", ret);
+		goto FAIL;
 	}
+	encoder->initialized = 1;
 
-	ret = mpp_buffer_group_get_internal(&encoder->group, MPP_BUFFER_TYPE_NORMAL);
+	ret = mpp_buffer_group_get_internal(&encoder->group, buffer_type);
 	if(ret != MPP_OK)
 	{
-		printf("mpp buffer group init failed\n");
-		return -1;
+		printf("mpp_buffer_group_get_internal failed ret=%d\n", ret);
+		goto FAIL;
 	}
 
-	MppEncCfg cfg;
-	mpp_enc_cfg_init(&cfg);
+	ret = mpp_buffer_get(encoder->group, &encoder->frm_buf, encoder->frame_size);
+	if(ret != MPP_OK)
+	{
+		printf("mpp_buffer_get input frame failed ret=%d\n", ret);
+		goto FAIL;
+	}
+
+	ret = mpp_buffer_get(encoder->group, &encoder->pkt_buf, encoder->frame_size);
+	if(ret != MPP_OK)
+	{
+		printf("mpp_buffer_get output packet failed ret=%d\n", ret);
+		goto FAIL;
+	}
+
+	ret = mpp_enc_cfg_init(&cfg);
+	if (ret != MPP_OK || cfg == NULL)
+	{
+		printf("mpp_enc_cfg_init failed ret=%d\n", ret);
+		goto FAIL;
+	}
+
+	ret = encoder->mpi->control(encoder->ctx, MPP_ENC_GET_CFG, cfg);
+	if (ret != MPP_OK)
+	{
+		printf("MPP_ENC_GET_CFG failed ret=%d\n", ret);
+		goto FAIL;
+	}
 
 	mpp_enc_cfg_set_s32(cfg, "codec:type", MPP_VIDEO_CodingAVC);
 
@@ -66,99 +162,190 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 
 	mpp_enc_cfg_set_s32(cfg, "rc:mode", MPP_ENC_RC_MODE_CBR);
 	mpp_enc_cfg_set_s32(cfg, "rc:bps_target", 4000000);
-	mpp_enc_cfg_set_s32(cfg, "rc:bps_max", 4000000);
-	mpp_enc_cfg_set_s32(cfg, "rc:bps_min",1000000);
-
+	mpp_enc_cfg_set_s32(cfg, "rc:bps_max", 4500000);
+	mpp_enc_cfg_set_s32(cfg, "rc:bps_min",3000000);
 	mpp_enc_cfg_set_s32(cfg, "rc:gop", 30);
+
+	mpp_enc_cfg_set_s32(cfg, "rc:fps_in_flex", 0);
 	mpp_enc_cfg_set_s32(cfg, "rc:fps_in_num", 30);
-	mpp_enc_cfg_set_s32(cfg, "rc:fps_in_denorm",	1);
+	mpp_enc_cfg_set_s32(cfg, "rc:fps_in_denorm", 1);
+	mpp_enc_cfg_set_s32(cfg, "rc:fps_out_flex", 0);
 	mpp_enc_cfg_set_s32(cfg, "rc:fps_out_num", 30);
 	mpp_enc_cfg_set_s32(cfg, "rc:fps_out_denorm", 1);
 
 	ret = encoder->mpi->control(encoder->ctx, MPP_ENC_SET_CFG, cfg);
 	if(ret != MPP_OK)
 	{
-		printf("control cfg failed\n");
-		return -1;
+		printf("MPP_ENC_SET_CFG failed ret=%d\n", ret);
+		goto FAIL;
 	}
 
 	mpp_enc_cfg_deinit(cfg);
-	printf("MPP encoder init success\n");
+	cfg = NULL;
+
+	if (mpp_encoder_get_header(encoder) != 0)
+	{
+		goto FAIL;
+	}
+
+	printf("MPP encoder init success, frame_size=%zu\n", encoder->frame_size); 
 	return 0;
+
+FAIL:
+	if (cfg != NULL)
+		mpp_enc_cfg_deinit(cfg);
+
+	mpp_encoder_close(encoder);
+	return -1;
 }
 
-int mpp_encoder_encode(MppEncoder *encoder, uint8_t *nv12, int size, uint8_t **out)
+int mpp_encoder_encode(MppEncoder *encoder, const uint8_t *nv12, int size, uint8_t **out)
 {
-	printf("input nv12 size=%d\n", size);
-
 	MPP_RET ret;
-	MppBuffer buffer;
-	ret = mpp_buffer_get(encoder->group, &buffer, size);
-	printf("encode_put_frame ret=%d\n", ret);
-	if(ret != MPP_OK)
+	MppFrame frame = NULL;
+	MppPacket packet = NULL;
+	MppMeta meta;
+	void *frm_ptr;
+	void *pkt_pos;
+	size_t pkt_len;
+	size_t total_len;
+	size_t prefix_len;
+
+	if (encoder == NULL || encoder->ctx == NULL || encoder->mpi == NULL ||
+			encoder->frm_buf == NULL || encoder->pkt_buf == NULL ||
+			nv12 == NULL || out == NULL)
 	{
-		printf("mpp_buffer_get failed\n");
+		printf("mpp_encoder_encode invalid parameter\n");
 		return -1;
 	}
 
-	void *ptr = mpp_buffer_get_ptr(buffer);
-	memcpy(ptr,nv12,size);
-	//ret = mpp_buffer_write(buffer, 0, nv12, size);
+	*out = NULL;
 
-	if(ret != MPP_OK)
+	if (size < 0 || (size_t)size < encoder->frame_size)
 	{
-		    printf("mpp_buffer_write failed ret=%d\n", ret);
-			return -1;
+		printf("NV12 size too small: input=%d expected=%zu\n", size, encoder->frame_size);
+		return -1;
 	}
 
-	MppFrame frame;
-	mpp_frame_init(&frame);
+	frm_ptr = mpp_buffer_get_ptr(encoder->frm_buf);
+	if (frm_ptr == NULL)
+	{
+		printf("mpp_buffer_get_ptr input frame failed\n");
+		return -1;
+	}
+
+	ret = mpp_buffer_sync_begin(encoder->frm_buf);
+	if (ret != MPP_OK)
+	{
+		printf("mpp_buffer_sync_begin failed ret=%d\n", ret);
+		return -1;
+	}
+
+	memcpy(frm_ptr, nv12, encoder->frame_size);
+
+	ret = mpp_buffer_sync_end(encoder->frm_buf);
+	if (ret != MPP_OK)
+	{
+		printf("mpp_buffer_sync_end failed ret=%d\n", ret);
+		return -1;
+	}
+
+	ret = mpp_frame_init(&frame);
+	if (ret != MPP_OK || frame == NULL)
+	{
+		printf("mpp_frame_init failed ret=%d\n", ret);
+		return -1;
+	}
 
 	mpp_frame_set_width(frame, encoder->width);
 	mpp_frame_set_height(frame, encoder->height);
 	mpp_frame_set_hor_stride(frame, encoder->width);
 	mpp_frame_set_ver_stride(frame, encoder->height);
 	mpp_frame_set_fmt(frame, MPP_FMT_YUV420SP);
-	mpp_frame_set_pts(frame, 0);
+	mpp_frame_set_pts(frame, encoder->frame_index++);
 	mpp_frame_set_eos(frame, 0);
-	mpp_frame_set_buf_size(frame,size);
-	mpp_frame_set_buffer(frame, buffer);
+	mpp_frame_set_buffer(frame, encoder->frm_buf);
+
+	ret = mpp_packet_init_with_buffer(&packet, encoder->pkt_buf);
+	if (ret != MPP_OK || packet == NULL)
+	{
+		printf("mpp_packet_init_with_buffer failed ret=%d\n", ret);
+		mpp_frame_deinit(&frame);
+		return -1;
+	}
+
+	mpp_packet_set_length(packet, 0);
+
+	meta = mpp_frame_get_meta(frame);
+	if (meta == NULL)
+	{
+		printf("mpp_frame_get_meta failed\n");
+		mpp_packet_deinit(&packet);
+		mpp_frame_deinit(&frame);
+		return -1;
+	}
+
+	ret = mpp_meta_set_packet(meta, KEY_OUTPUT_PACKET, packet);
+	if (ret != MPP_OK)
+	{
+		printf("mpp_meta_set_packet KEY_OUTPUT_PACKET failed ret=%d\n", ret);
+		mpp_packet_deinit(&packet);
+		mpp_frame_deinit(&frame);
+		return -1;
+	}
 
 	ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
+	printf("encode_put_frame ret=%d\n", ret);
 
-	MppPacket packet=NULL;
-
-	for(int i=0;i<100;i++)
-	{
-		ret = encoder->mpi->encode_get_packet(encoder->ctx, &packet);
-		printf("packet poll %d ret=%d packet=%p\n", i, ret, packet);
-		if(packet)
-			break;
-
-		usleep(10000);
-	}
-	if(packet==NULL)
-	{
-		printf("no packet output\n");
-		return -1;
-	}
-
-
-	if(ret != MPP_OK || packet==NULL)
-	{
-		printf("encode_get_packet failed\n");
-		return -1;
-	}
-
-	void *data = mpp_packet_get_data(packet);
-	int len = mpp_packet_get_length(packet);
-	*out = malloc(len);
-	memcpy(*out,data,len);
-	printf("encode h264 size=%d\n",len);
-	mpp_packet_deinit(&packet);
-	mpp_buffer_put(buffer);
 	mpp_frame_deinit(&frame);
-	return len;
+
+	if (ret != MPP_OK)
+	{
+		mpp_packet_deinit(&packet);
+		return -1;
+	}
+
+	ret = encoder->mpi->encode_get_packet(encoder->ctx, &packet);
+	printf("encode_get_packet ret=%d packet=%p\n", ret, packet);
+	if (ret != MPP_OK || packet == NULL)
+	{
+		if (packet != NULL)
+			mpp_packet_deinit(&packet);
+		return -1;
+	}
+
+	pkt_pos = mpp_packet_get_pos(packet);
+	pkt_len = mpp_packet_get_length(packet);
+	if (pkt_pos == NULL || pkt_len == 0)
+	{
+		printf("encoded packet is empty\n");
+		mpp_packet_deinit(&packet);
+		return -1;
+	}
+
+	prefix_len = encoder->header_pending ? encoder->header_len : 0;
+	total_len = prefix_len + pkt_len;
+
+	*out = malloc(total_len);
+	if (*out == NULL)
+	{
+		printf("malloc H264 output failed, size=%zu\n", total_len);
+		mpp_packet_deinit(&packet);
+		return -1;
+	}
+
+	if (prefix_len > 0)
+	{
+		memcpy(*out, encoder->header_data, prefix_len);
+		encoder->header_pending = 0;
+	}
+
+	memcpy(*out + prefix_len, pkt_pos, pkt_len);
+
+	printf("encode H264 packet=%zu total_output=%zu\n", pkt_len, total_len);
+
+	mpp_packet_deinit(&packet);
+	return (int)total_len;
 }
 
 void mpp_encoder_close(MppEncoder *encoder)
@@ -166,17 +353,38 @@ void mpp_encoder_close(MppEncoder *encoder)
 	if(encoder == NULL)
 		return;
 
-	if(encoder->group)
+	if (encoder->initialized && encoder->ctx != NULL && encoder->mpi != NULL)
+		encoder->mpi->reset(encoder->ctx);
+
+	if (encoder->frm_buf != NULL)
 	{
-		mpp_buffer_group_put(encoder->group);
-		encoder->group=NULL;
+		mpp_buffer_put(encoder->frm_buf);
+		encoder->frm_buf = NULL;
 	}
 
-	if(encoder->ctx)
+	if (encoder->pkt_buf != NULL)
+	{
+		mpp_buffer_put(encoder->pkt_buf);
+		encoder->pkt_buf = NULL;
+	}
+
+	if (encoder->group != NULL)
+	{
+		mpp_buffer_group_put(encoder->group);
+		encoder->group = NULL;
+	}
+
+	free(encoder->header_data);
+	encoder->header_data = NULL;
+	encoder->header_len = 0;
+	encoder->header_pending = 0;
+
+	if (encoder->ctx != NULL)
 	{
 		mpp_destroy(encoder->ctx);
 		encoder->ctx = NULL;
 	}
 
 	encoder->mpi = NULL;
+	encoder->initialized = 0;
 }
