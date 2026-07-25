@@ -38,13 +38,7 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
     MPP_RET ret;
     MppPollType timeout = MPP_POLL_BLOCK;
     MppEncCfg cfg = NULL;
-
-	if (ret != MPP_OK || encoder->group == NULL)
-	{
-		printf("mpp_buffer_group_get_internal failed ret=%d group=%p\n", 
-				ret, encoder->group);
-		goto FAIL;
-	}
+    MppBufferType buffer_type = MPP_BUFFER_TYPE_DRM;
 
     if (encoder == NULL || width <= 0 || height <= 0)
     {
@@ -103,28 +97,14 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
         goto FAIL;
     }
 
-	encoder->group = NULL;
-	ret = mpp_buffer_group_get_internal(
-			        &encoder->group,
-					        MPP_BUFFER_TYPE_ION);
+    ret = mpp_buffer_group_get_internal(&encoder->group,
+                                        buffer_type);
 
-	printf("mpp_buffer_group_get_internal "
-			"ret=%d group=%p type=%d\n",
-			ret, encoder->group, MPP_BUFFER_TYPE_ION);
-
-	if (ret != MPP_OK)
-	{
-		printf("mpp_buffer_group_get_internal API failed "
-				"ret=%d\n", ret);
-		goto FAIL;
-	}
-
-	if (encoder->group == NULL)
-	{
-		printf("mpp_buffer_group_get_internal returned "
-				"NULL group\n");
-		goto FAIL;
-	}
+    if (ret != MPP_OK || encoder->group == NULL)
+    {
+        printf("mpp_buffer_group_get_internal failed ret=%d\n", ret);
+        goto FAIL;
+    }
 
     /* 输入 NV12 帧缓冲区。 */
     ret = mpp_buffer_get(encoder->group,
