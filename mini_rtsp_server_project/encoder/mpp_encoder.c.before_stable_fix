@@ -1,0 +1,525 @@
+/*********************************************************************************
+ *      Copyright:  (C) 2026 Zuo Caimei <zuocaimei@gmail.com>
+ *                  All rights reserved.
+ *
+ *       Filename:  mpp_encoder.c
+ *    Description:  RV1106 NV12 to H264 encoder based on Rockchip MPP.
+ *
+ *        Version:  1.0.0 (07/25/2026)
+ *         Author:  Zuo Caimei <zuocaimei@gmail.com>
+ *      ChangeLog:  1. Diagnostic version for validating H264 data in pkt_buf.
+ *
+ ********************************************************************************/
+
+#include "mpp_encoder.h"
+#include "rockchip/rk_venc_cfg.h"
+#include "rockchip/rk_venc_rc.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/*
+ * 当前版本的目标只有一个：
+ *
+ *     一帧 NV12 -> MPP 硬件编码 -> 从 pkt_buf 复制 H264 数据
+ *
+ * 已知当前板端运行库在 encode_get_packet() 返回后，会对 MppPacket
+ * 产生 check_is_mpp_packet 警告。因此这个版本暂时不调用
+ * mpp_packet_get_pos()/mpp_packet_get_data()/mpp_packet_get_size()，
+ * 而是直接从预先绑定的 pkt_buf 获取编码数据地址。
+ *
+ * 该版本先用于单帧测试。确认 H264 数据有效后，再继续整理连续编码时
+ * MppPacket 的释放和复用流程。
+ */
+
+int mpp_encoder_init(MppEncoder *encoder, int width, int height)
+{
+    MPP_RET ret;
+    MppPollType timeout = MPP_POLL_BLOCK;
+    MppEncCfg cfg = NULL;
+
+	if (ret != MPP_OK || encoder->group == NULL)
+	{
+		printf("mpp_buffer_group_get_internal failed ret=%d group=%p\n", 
+				ret, encoder->group);
+		goto FAIL;
+	}
+
+    if (encoder == NULL || width <= 0 || height <= 0)
+    {
+        printf("invalid encoder parameter\n");
+        return -1;
+    }
+
+    memset(encoder, 0, sizeof(*encoder));
+
+    encoder->width = width;
+    encoder->height = height;
+    encoder->frame_size = (size_t)width * (size_t)height * 3U / 2U;
+    encoder->frame_index = 0;
+
+    printf("before mpp_create\n");
+
+    ret = mpp_create(&encoder->ctx, &encoder->mpi);
+    printf("after mpp_create: ret=%d ctx=%p mpi=%p\n",
+           ret,
+           encoder->ctx,
+           encoder->mpi);
+
+    if (ret != MPP_OK || encoder->ctx == NULL || encoder->mpi == NULL)
+    {
+        printf("mpp_create failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+    /*
+     * 这块 RV1106 板上已经验证：必须先 mpp_init，
+     * 再设置 MPP_SET_OUTPUT_TIMEOUT。
+     */
+    ret = mpp_init(encoder->ctx,
+                   MPP_CTX_ENC,
+                   MPP_VIDEO_CodingAVC);
+
+    printf("after mpp_init: ret=%d\n", ret);
+
+    if (ret != MPP_OK)
+    {
+        printf("mpp_init failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+    encoder->initialized = 1;
+
+    ret = encoder->mpi->control(encoder->ctx,
+                                MPP_SET_OUTPUT_TIMEOUT,
+                                &timeout);
+
+    printf("MPP_SET_OUTPUT_TIMEOUT ret=%d\n", ret);
+
+    if (ret != MPP_OK)
+    {
+        printf("MPP_SET_OUTPUT_TIMEOUT failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+	encoder->group = NULL;
+	ret = mpp_buffer_group_get_internal(
+			        &encoder->group,
+					        MPP_BUFFER_TYPE_ION);
+
+	printf("mpp_buffer_group_get_internal "
+			"ret=%d group=%p type=%d\n",
+			ret, encoder->group, MPP_BUFFER_TYPE_ION);
+
+	if (ret != MPP_OK)
+	{
+		printf("mpp_buffer_group_get_internal API failed "
+				"ret=%d\n", ret);
+		goto FAIL;
+	}
+
+	if (encoder->group == NULL)
+	{
+		printf("mpp_buffer_group_get_internal returned "
+				"NULL group\n");
+		goto FAIL;
+	}
+
+    /* 输入 NV12 帧缓冲区。 */
+    ret = mpp_buffer_get(encoder->group,
+                         &encoder->frm_buf,
+                         encoder->frame_size);
+
+    if (ret != MPP_OK || encoder->frm_buf == NULL)
+    {
+        printf("mpp_buffer_get frm_buf failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+    /* 输出 H264 码流缓冲区。 */
+    ret = mpp_buffer_get(encoder->group,
+                         &encoder->pkt_buf,
+                         encoder->frame_size);
+
+    if (ret != MPP_OK || encoder->pkt_buf == NULL)
+    {
+        printf("mpp_buffer_get pkt_buf failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+    /*
+     * 当前运行库的 mpp_buffer_get_size() 会异常返回 0，
+     * 因此这里不再调用它，只确认两个缓冲区都具有映射地址。
+     */
+    printf("frm_buf=%p ptr=%p\n",
+           encoder->frm_buf,
+           mpp_buffer_get_ptr(encoder->frm_buf));
+
+    printf("pkt_buf=%p ptr=%p\n",
+           encoder->pkt_buf,
+           mpp_buffer_get_ptr(encoder->pkt_buf));
+
+    if (mpp_buffer_get_ptr(encoder->frm_buf) == NULL ||
+        mpp_buffer_get_ptr(encoder->pkt_buf) == NULL)
+    {
+        printf("MPP buffer virtual address is NULL\n");
+        goto FAIL;
+    }
+
+    ret = mpp_enc_cfg_init(&cfg);
+
+    if (ret != MPP_OK || cfg == NULL)
+    {
+        printf("mpp_enc_cfg_init failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+    /* 先获取编码器默认配置，再覆盖本工程需要的字段。 */
+    ret = encoder->mpi->control(encoder->ctx,
+                                MPP_ENC_GET_CFG,
+                                cfg);
+
+    if (ret != MPP_OK)
+    {
+        printf("MPP_ENC_GET_CFG failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+    mpp_enc_cfg_set_s32(cfg,
+                        "codec:type",
+                        MPP_VIDEO_CodingAVC);
+
+    mpp_enc_cfg_set_s32(cfg, "prep:width", width);
+    mpp_enc_cfg_set_s32(cfg, "prep:height", height);
+    mpp_enc_cfg_set_s32(cfg, "prep:hor_stride", width);
+    mpp_enc_cfg_set_s32(cfg, "prep:ver_stride", height);
+    mpp_enc_cfg_set_s32(cfg,
+                        "prep:format",
+                        MPP_FMT_YUV420SP);
+
+    mpp_enc_cfg_set_s32(cfg,
+                        "rc:mode",
+                        MPP_ENC_RC_MODE_CBR);
+
+    mpp_enc_cfg_set_s32(cfg, "rc:bps_target", 4000000);
+    mpp_enc_cfg_set_s32(cfg, "rc:bps_max", 4500000);
+    mpp_enc_cfg_set_s32(cfg, "rc:bps_min", 3000000);
+    mpp_enc_cfg_set_s32(cfg, "rc:gop", 30);
+
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_in_flex", 0);
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_in_num", 30);
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_in_denorm", 1);
+
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_out_flex", 0);
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_out_num", 30);
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_out_denorm", 1);
+
+    ret = encoder->mpi->control(encoder->ctx,
+                                MPP_ENC_SET_CFG,
+                                cfg);
+
+    if (ret != MPP_OK)
+    {
+        printf("MPP_ENC_SET_CFG failed ret=%d\n", ret);
+        goto FAIL;
+    }
+
+    mpp_enc_cfg_deinit(cfg);
+    cfg = NULL;
+
+    /*
+     * 暂时不单独调用 MPP_ENC_GET_HDR_SYNC。
+     * 本轮先验证从 pkt_buf 中取得的编码结果是否是有效 H264。
+     */
+    encoder->header_data = NULL;
+    encoder->header_len = 0;
+    encoder->header_pending = 0;
+
+    printf("MPP encoder init success, frame_size=%zu\n",
+           encoder->frame_size);
+
+    return 0;
+
+FAIL:
+    if (cfg != NULL)
+    {
+        mpp_enc_cfg_deinit(cfg);
+        cfg = NULL;
+    }
+
+    mpp_encoder_close(encoder);
+    return -1;
+}
+
+int mpp_encoder_encode(MppEncoder *encoder,
+                       const uint8_t *nv12,
+                       int size,
+                       uint8_t **out)
+{
+    MPP_RET ret;
+    MppFrame frame = NULL;
+    MppPacket packet = NULL;
+    MppMeta meta = NULL;
+
+    void *frm_ptr = NULL;
+    void *pkt_ptr = NULL;
+    size_t pkt_len = 0;
+    size_t dump_len = 0;
+
+    int get_packet_called = 0;
+    int result = -1;
+
+    if (encoder == NULL ||
+        encoder->ctx == NULL ||
+        encoder->mpi == NULL ||
+        encoder->frm_buf == NULL ||
+        encoder->pkt_buf == NULL ||
+        nv12 == NULL ||
+        out == NULL)
+    {
+        printf("mpp_encoder_encode invalid parameter\n");
+        return -1;
+    }
+
+    *out = NULL;
+
+    printf("start encode NV12, input=%d expected=%zu\n",
+           size,
+           encoder->frame_size);
+
+    if (size < 0 || (size_t)size < encoder->frame_size)
+    {
+        printf("NV12 size too small: input=%d expected=%zu\n",
+               size,
+               encoder->frame_size);
+        return -1;
+    }
+
+    frm_ptr = mpp_buffer_get_ptr(encoder->frm_buf);
+
+    if (frm_ptr == NULL)
+    {
+        printf("mpp_buffer_get_ptr frm_buf failed\n");
+        return -1;
+    }
+
+    memcpy(frm_ptr,
+           nv12,
+           encoder->frame_size);
+
+    ret = mpp_frame_init(&frame);
+
+    if (ret != MPP_OK || frame == NULL)
+    {
+        printf("mpp_frame_init failed ret=%d\n", ret);
+        goto CLEANUP;
+    }
+
+    mpp_frame_set_width(frame, encoder->width);
+    mpp_frame_set_height(frame, encoder->height);
+    mpp_frame_set_hor_stride(frame, encoder->width);
+    mpp_frame_set_ver_stride(frame, encoder->height);
+    mpp_frame_set_fmt(frame, MPP_FMT_YUV420SP);
+    mpp_frame_set_buf_size(frame, encoder->frame_size);
+    mpp_frame_set_pts(frame, encoder->frame_index++);
+    mpp_frame_set_eos(frame, 0);
+    mpp_frame_set_buffer(frame, encoder->frm_buf);
+
+    /*
+     * 按官方 mpi_enc_test 的方式，使用预先分配的 pkt_buf
+     * 创建输出 Packet，并绑定到输入 Frame 的 metadata。
+     */
+    ret = mpp_packet_init_with_buffer(&packet,
+                                      encoder->pkt_buf);
+
+    printf("output packet init ret=%d packet=%p\n",
+           ret,
+           packet);
+
+    if (ret != MPP_OK || packet == NULL)
+    {
+        printf("mpp_packet_init_with_buffer failed ret=%d\n", ret);
+        goto CLEANUP;
+    }
+
+    /* 输出 Packet 在每帧提交前必须把有效长度清零。 */
+    mpp_packet_set_length(packet, 0);
+
+    meta = mpp_frame_get_meta(frame);
+
+    if (meta == NULL)
+    {
+        printf("mpp_frame_get_meta failed\n");
+        goto CLEANUP;
+    }
+
+    ret = mpp_meta_set_packet(meta,
+                              KEY_OUTPUT_PACKET,
+                              packet);
+
+    if (ret != MPP_OK)
+    {
+        printf("mpp_meta_set_packet KEY_OUTPUT_PACKET failed ret=%d\n",
+               ret);
+        goto CLEANUP;
+    }
+
+    ret = encoder->mpi->encode_put_frame(encoder->ctx,
+                                         frame);
+
+    printf("encode_put_frame ret=%d\n", ret);
+
+    if (ret != MPP_OK)
+        goto CLEANUP;
+
+    /* MPP 已经接收 Frame 包装对象。 */
+    mpp_frame_deinit(&frame);
+    frame = NULL;
+
+    ret = encoder->mpi->encode_get_packet(encoder->ctx,
+                                          &packet);
+
+    get_packet_called = 1;
+
+    printf("encode_get_packet ret=%d packet=%p\n",
+           ret,
+           packet);
+
+    if (ret != MPP_OK || packet == NULL)
+    {
+        printf("encode_get_packet failed\n");
+        goto CLEANUP;
+    }
+
+    /*
+     * 当前板端库在这里对 Packet 包装对象执行 get_pos/get_data/get_size
+     * 会触发 check_is_mpp_packet 错误。
+     *
+     * 但是上一轮日志已经显示 mpp_packet_get_length() 得到了 26372，
+     * 且编码器使用的真实输出内存就是预先绑定的 pkt_buf。
+     * 因此本轮只读取一次长度，然后直接从 pkt_buf 获取地址。
+     */
+    pkt_len = mpp_packet_get_length(packet);
+    pkt_ptr = mpp_buffer_get_ptr(encoder->pkt_buf);
+
+    printf("encoded pkt_buf ptr=%p len=%zu\n",
+           pkt_ptr,
+           pkt_len);
+
+    if (pkt_ptr == NULL || pkt_len == 0)
+    {
+        printf("encoded packet buffer is empty\n");
+        goto CLEANUP;
+    }
+
+    dump_len = (pkt_len < 16U) ? pkt_len : 16U;
+
+    printf("H264 first bytes:");
+
+    for (size_t i = 0; i < dump_len; ++i)
+    {
+        printf(" %02x",
+               ((const unsigned char *)pkt_ptr)[i]);
+    }
+
+    printf("\n");
+
+    *out = malloc(pkt_len);
+
+    if (*out == NULL)
+    {
+        printf("malloc H264 output failed, size=%zu\n",
+               pkt_len);
+        goto CLEANUP;
+    }
+
+    memcpy(*out,
+           pkt_ptr,
+           pkt_len);
+
+    printf("encode H264 success, size=%zu\n",
+           pkt_len);
+
+    result = (int)pkt_len;
+
+CLEANUP:
+    if (frame != NULL)
+    {
+        mpp_frame_deinit(&frame);
+        frame = NULL;
+    }
+
+    /*
+     * 重要：
+     * 当前板端运行库在 encode_get_packet() 之后调用
+     * mpp_packet_deinit() 会触发对象校验失败并导致崩溃。
+     *
+     * 单帧诊断中，如果已经调用 encode_get_packet()，这里暂时不再
+     * deinit Packet 包装对象。确认 H264 数据有效后，再继续解决
+     * 运行库匹配和连续编码时的 Packet 生命周期。
+     */
+    if (packet != NULL && !get_packet_called)
+    {
+        mpp_packet_deinit(&packet);
+        packet = NULL;
+    }
+    else
+    {
+        packet = NULL;
+    }
+
+    if (result < 0 && *out != NULL)
+    {
+        free(*out);
+        *out = NULL;
+    }
+
+    return result;
+}
+
+void mpp_encoder_close(MppEncoder *encoder)
+{
+    if (encoder == NULL)
+        return;
+
+    if (encoder->initialized &&
+        encoder->ctx != NULL &&
+        encoder->mpi != NULL)
+    {
+        encoder->mpi->reset(encoder->ctx);
+    }
+
+    if (encoder->frm_buf != NULL)
+    {
+        mpp_buffer_put(encoder->frm_buf);
+        encoder->frm_buf = NULL;
+    }
+
+    if (encoder->pkt_buf != NULL)
+    {
+        mpp_buffer_put(encoder->pkt_buf);
+        encoder->pkt_buf = NULL;
+    }
+
+    if (encoder->group != NULL)
+    {
+        mpp_buffer_group_put(encoder->group);
+        encoder->group = NULL;
+    }
+
+    free(encoder->header_data);
+    encoder->header_data = NULL;
+    encoder->header_len = 0;
+    encoder->header_pending = 0;
+
+    if (encoder->ctx != NULL)
+    {
+        mpp_destroy(encoder->ctx);
+        encoder->ctx = NULL;
+    }
+
+    encoder->mpi = NULL;
+    encoder->initialized = 0;
+    encoder->frame_index = 0;
+}
