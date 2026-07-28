@@ -1,0 +1,849 @@
+mpp[3180]: mpp_buffer: mpi_buf_id = 173, dma_buf_fd = 5
+
+mpp[3180]: mpp_buffer: mpi_buf_id = 174, dma_buf_fd = 7
+
+mpp[3180]: mpp_info: mpp version: 16e796a4 author: hdl           2024-02-20 [venc540c]: Adding scene_mode of IPC_PTZ.
+
+live camera encode test
+device       : /dev/video11
+output       : output_camera_100.h264
+resolution   : 2304x1296 NV12
+expected NV12: 4478976 bytes/frame
+frame count  : 100
+warmup frames: 5
+raw NV12 intermediate files: disabled
+capture format: 2304x1296 fourcc=NV12 planes=1 bytesperline=2304 sizeimage=4478976
+warning: VIDIOC_S_PARM 25 fps failed: Inappropriate ioctl for device
+capture frame interval: 1/0 s (0.00 fps)
+capture buffer 0: addr=0xa6900000 length=4478976
+capture buffer 1: addr=0xa64ba000 length=4478976
+capture buffer 2: addr=0xa6074000 length=4478976
+capture buffer 3: addr=0xa5c2e000 length=4478976
+warmup frame 1/5: sequence=0 size=4478976
+warmup frame 2/5: sequence=1 size=4478976
+warmup frame 3/5: sequence=2 size=4478976
+warmup frame 4/5: sequence=3 size=4478976
+warmup frame 5/5: sequence=4 size=4478976
+MPP encoder build: stable-vendor-packet-v8
+NV12 visible_size=4478976 allocated_buffer_size=4644864
+pre-create frm_buf ret=0 buf=0x2b1c0 ptr=0xa57c0000
+pre-create auxiliary buf ret=0 buf=0x2b260 ptr=0xa5352000
+before mpp_create
+after mpp_create: ret=0 ctx=0x2b300 mpi=0xa6f4939c
+MppApi sizeof=132 api_size=132 version=0 release_packet=0xa6f1c9c4
+after mpp_init_ext: ret=0
+MPP_SET_OUTPUT_TIMEOUT ret=0
+MPP encoder init success
+start encode NV12 with RV1106 vendor packet ABI, frame=0
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=134182 buf_size=1495040 offset=0 data_num=1 flag=0x00000010 pts=0
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 67 42 c0 32 8d 8d 50 12 00 51 90 80
+encode_release_packet ret=0
+camera frame 1/100: sequence=5 nv12=4478976 h264=134182 acquire=23.356 ms encode=31.242 ms write=0.440 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=1
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=19572 buf_size=1495040 offset=134272 data_num=1 flag=0x00000000 pts=1
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 20 00 46 09 de 1b 65 4b b8
+encode_release_packet ret=0
+camera frame 2/100: sequence=6 nv12=4478976 h264=19572 acquire=7.792 ms encode=30.269 ms write=0.141 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=2
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=34374 buf_size=1495040 offset=153856 data_num=1 flag=0x00000000 pts=2
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 40 00 86 09 f0 31 80 8c 0a
+encode_release_packet ret=0
+camera frame 3/100: sequence=7 nv12=4478976 h264=34374 acquire=9.079 ms encode=26.318 ms write=0.175 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=3
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=22842 buf_size=1495040 offset=188288 data_num=1 flag=0x00000000 pts=3
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 60 00 c6 05 7c 30 01 04 65
+encode_release_packet ret=0
+camera frame 4/100: sequence=8 nv12=4478976 h264=22842 acquire=13.027 ms encode=26.833 ms write=0.139 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=4
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=19307 buf_size=1495040 offset=211200 data_num=1 flag=0x00000000 pts=4
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 80 01 06 06 7c 26 01 ea 0a
+encode_release_packet ret=0
+camera frame 5/100: sequence=9 nv12=4478976 h264=19307 acquire=12.541 ms encode=26.439 ms write=0.130 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=5
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16388 buf_size=1495040 offset=230528 data_num=1 flag=0x00000000 pts=5
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 a0 01 46 06 7e 01 16 0a 16
+encode_release_packet ret=0
+camera frame 6/100: sequence=10 nv12=4478976 h264=16388 acquire=12.932 ms encode=27.075 ms write=0.101 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=6
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=14488 buf_size=1495040 offset=247040 data_num=1 flag=0x00000000 pts=6
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 c0 01 86 07 7e 04 63 16 ff
+encode_release_packet ret=0
+camera frame 7/100: sequence=11 nv12=4478976 h264=14488 acquire=12.349 ms encode=26.343 ms write=0.119 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=7
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13380 buf_size=1495040 offset=261632 data_num=1 flag=0x00000000 pts=7
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 e0 01 c6 07 7c 18 81 5b 85
+encode_release_packet ret=0
+camera frame 8/100: sequence=12 nv12=4478976 h264=13380 acquire=13.048 ms encode=26.831 ms write=0.119 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=8
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=7004 buf_size=1495040 offset=275072 data_num=1 flag=0x00000000 pts=8
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 00 02 06 07 71 90 6d 1e 5d
+encode_release_packet ret=0
+camera frame 9/100: sequence=13 nv12=4478976 h264=7004 acquire=12.562 ms encode=26.267 ms write=0.091 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=9
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=9481 buf_size=1495040 offset=282112 data_num=1 flag=0x00000000 pts=9
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 20 02 46 07 73 60 47 21 74
+encode_release_packet ret=0
+camera frame 10/100: sequence=14 nv12=4478976 h264=9481 acquire=13.163 ms encode=26.866 ms write=0.111 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=10
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15088 buf_size=1495040 offset=291712 data_num=1 flag=0x00000000 pts=10
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 40 02 86 07 7e 0f d9 5f f1
+encode_release_packet ret=0
+camera frame 11/100: sequence=15 nv12=4478976 h264=15088 acquire=12.528 ms encode=26.309 ms write=0.122 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=11
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=19114 buf_size=1495040 offset=306816 data_num=1 flag=0x00000000 pts=11
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 60 02 c6 07 7c 02 f9 04 25
+encode_release_packet ret=0
+camera frame 12/100: sequence=16 nv12=4478976 h264=19114 acquire=13.088 ms encode=26.814 ms write=0.136 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=12
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16419 buf_size=1495040 offset=326016 data_num=1 flag=0x00000000 pts=12
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 80 03 06 02 5e 36 53 e0 e0
+encode_release_packet ret=0
+camera frame 13/100: sequence=17 nv12=4478976 h264=16419 acquire=12.566 ms encode=26.278 ms write=0.119 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=13
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13270 buf_size=1495040 offset=342528 data_num=1 flag=0x00000000 pts=13
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 a0 03 46 02 5f 00 7b 91 22
+encode_release_packet ret=0
+camera frame 14/100: sequence=18 nv12=4478976 h264=13270 acquire=13.113 ms encode=27.009 ms write=0.067 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=14
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12398 buf_size=1495040 offset=355840 data_num=1 flag=0x00000000 pts=14
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 c0 03 86 02 5f 00 5b 10 80
+encode_release_packet ret=0
+camera frame 15/100: sequence=19 nv12=4478976 h264=12398 acquire=12.425 ms encode=26.234 ms write=0.121 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=15
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=6733 buf_size=1495040 offset=368256 data_num=1 flag=0x00000000 pts=15
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 e0 03 c6 02 5d 8d 84 41 66
+encode_release_packet ret=0
+camera frame 16/100: sequence=20 nv12=4478976 h264=6733 acquire=13.169 ms encode=26.876 ms write=0.100 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=16
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=5341 buf_size=1495040 offset=375040 data_num=1 flag=0x00000000 pts=16
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 00 04 06 02 5c 90 f7 87 c0
+encode_release_packet ret=0
+camera frame 17/100: sequence=21 nv12=4478976 h264=5341 acquire=12.544 ms encode=26.421 ms write=0.090 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=17
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=6878 buf_size=1495040 offset=380416 data_num=1 flag=0x00000000 pts=17
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 20 04 46 02 5c 90 ff 90 0f
+encode_release_packet ret=0
+camera frame 18/100: sequence=22 nv12=4478976 h264=6878 acquire=12.992 ms encode=26.946 ms write=0.101 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=18
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=10056 buf_size=1495040 offset=387328 data_num=1 flag=0x00000000 pts=18
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 40 04 86 02 5c 90 18 7e 00
+encode_release_packet ret=0
+camera frame 19/100: sequence=23 nv12=4478976 h264=10056 acquire=12.471 ms encode=26.273 ms write=0.114 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=19
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12334 buf_size=1495040 offset=397440 data_num=1 flag=0x00000000 pts=19
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 60 04 c6 02 5e 36 51 40 00
+encode_release_packet ret=0
+camera frame 20/100: sequence=24 nv12=4478976 h264=12334 acquire=13.128 ms encode=26.885 ms write=0.116 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=20
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13696 buf_size=1495040 offset=409856 data_num=1 flag=0x00000000 pts=20
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 80 05 06 02 5e 36 51 20 03
+encode_release_packet ret=0
+camera frame 21/100: sequence=25 nv12=4478976 h264=13696 acquire=12.518 ms encode=26.256 ms write=0.128 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=21
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12848 buf_size=1495040 offset=423552 data_num=1 flag=0x00000000 pts=21
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 a0 05 46 02 5f 06 20 0a 20
+encode_release_packet ret=0
+camera frame 22/100: sequence=26 nv12=4478976 h264=12848 acquire=13.135 ms encode=26.858 ms write=0.121 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=22
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=11802 buf_size=1495040 offset=436480 data_num=1 flag=0x00000000 pts=22
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 c0 05 86 02 5f 80 e2 21 6d
+encode_release_packet ret=0
+camera frame 23/100: sequence=27 nv12=4478976 h264=11802 acquire=12.477 ms encode=26.345 ms write=0.112 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=23
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=10059 buf_size=1495040 offset=448384 data_num=1 flag=0x00000000 pts=23
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 e0 05 c6 02 5d 60 ba 22 07
+encode_release_packet ret=0
+camera frame 24/100: sequence=28 nv12=4478976 h264=10059 acquire=13.057 ms encode=26.929 ms write=0.105 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=24
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=8906 buf_size=1495040 offset=458496 data_num=1 flag=0x00000000 pts=24
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 00 06 06 02 5f 60 fa 86 ea
+encode_release_packet ret=0
+camera frame 25/100: sequence=29 nv12=4478976 h264=8906 acquire=12.480 ms encode=26.290 ms write=0.109 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=25
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=11295 buf_size=1495040 offset=467456 data_num=1 flag=0x00000000 pts=25
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 20 06 46 02 1d 60 fa b0 7d
+encode_release_packet ret=0
+camera frame 26/100: sequence=30 nv12=4478976 h264=11295 acquire=13.113 ms encode=26.853 ms write=0.105 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=26
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=10452 buf_size=1495040 offset=478848 data_num=1 flag=0x00000000 pts=26
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 40 06 86 02 1f 83 e7 d6 a1
+encode_release_packet ret=0
+camera frame 27/100: sequence=31 nv12=4478976 h264=10452 acquire=12.548 ms encode=26.266 ms write=0.120 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=27
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=7209 buf_size=1495040 offset=489344 data_num=1 flag=0x00000000 pts=27
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 60 06 c6 02 1d e0 fa 78 1d
+encode_release_packet ret=0
+camera frame 28/100: sequence=32 nv12=4478976 h264=7209 acquire=13.145 ms encode=26.942 ms write=0.096 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=28
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=4263 buf_size=1495040 offset=496640 data_num=1 flag=0x00000000 pts=28
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 80 07 06 02 1c 4c 0b 81 e6
+encode_release_packet ret=0
+camera frame 29/100: sequence=33 nv12=4478976 h264=4263 acquire=12.473 ms encode=26.285 ms write=0.087 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=29
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=4359 buf_size=1495040 offset=500992 data_num=1 flag=0x00000000 pts=29
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 a0 07 46 07 73 43 f0 4a 5a
+encode_release_packet ret=0
+camera frame 30/100: sequence=34 nv12=4478976 h264=4359 acquire=13.136 ms encode=27.184 ms write=0.090 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=30
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=82793 buf_size=1495040 offset=505472 data_num=1 flag=0x00000010 pts=30
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 65 b8 00 02 00 00 09 c2 92 80 b3 30
+encode_release_packet ret=0
+camera frame 31/100: sequence=35 nv12=4478976 h264=82793 acquire=12.190 ms encode=26.048 ms write=0.318 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=31
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=9515 buf_size=1495040 offset=588288 data_num=1 flag=0x00000000 pts=31
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 20 00 46 02 1d c7 6e 07 48
+encode_release_packet ret=0
+camera frame 32/100: sequence=36 nv12=4478976 h264=9515 acquire=13.144 ms encode=26.822 ms write=0.108 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=32
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15424 buf_size=1495040 offset=597888 data_num=1 flag=0x00000000 pts=32
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 40 00 86 07 7c 2a 0d 44 df
+encode_release_packet ret=0
+camera frame 33/100: sequence=37 nv12=4478976 h264=15424 acquire=12.574 ms encode=26.394 ms write=0.127 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=33
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=19316 buf_size=1495040 offset=613376 data_num=1 flag=0x00000000 pts=33
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 60 00 c6 07 7c 0d 20 63 45
+encode_release_packet ret=0
+camera frame 34/100: sequence=38 nv12=4478976 h264=19316 acquire=12.995 ms encode=26.839 ms write=0.132 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=34
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16227 buf_size=1495040 offset=632704 data_num=1 flag=0x00000000 pts=34
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 80 01 06 02 5e 37 03 58 00
+encode_release_packet ret=0
+camera frame 35/100: sequence=39 nv12=4478976 h264=16227 acquire=12.531 ms encode=26.260 ms write=0.127 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=35
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13939 buf_size=1495040 offset=648960 data_num=1 flag=0x00000000 pts=35
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 a0 01 46 02 5e 36 51 40 00
+encode_release_packet ret=0
+camera frame 36/100: sequence=40 nv12=4478976 h264=13939 acquire=13.128 ms encode=26.871 ms write=0.128 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=36
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12295 buf_size=1495040 offset=662912 data_num=1 flag=0x00000000 pts=36
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 c0 01 86 02 5e 36 51 40 00
+encode_release_packet ret=0
+camera frame 37/100: sequence=41 nv12=4478976 h264=12295 acquire=12.518 ms encode=26.224 ms write=0.114 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=37
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=10318 buf_size=1495040 offset=675328 data_num=1 flag=0x00000000 pts=37
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 e0 01 c6 02 5f 00 43 96 25
+encode_release_packet ret=0
+camera frame 38/100: sequence=42 nv12=4478976 h264=10318 acquire=13.178 ms encode=26.851 ms write=0.108 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=38
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=6716 buf_size=1495040 offset=685696 data_num=1 flag=0x00000000 pts=38
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 00 02 06 02 5c 83 25 0b 81
+encode_release_packet ret=0
+camera frame 39/100: sequence=43 nv12=4478976 h264=6716 acquire=12.548 ms encode=26.412 ms write=0.096 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=39
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=9370 buf_size=1495040 offset=692480 data_num=1 flag=0x00000000 pts=39
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 20 02 46 02 1c 46 0e 38 7c
+encode_release_packet ret=0
+camera frame 40/100: sequence=44 nv12=4478976 h264=9370 acquire=13.005 ms encode=26.903 ms write=0.105 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=40
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=10854 buf_size=1495040 offset=701952 data_num=1 flag=0x00000000 pts=40
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 40 02 86 02 1c 82 22 57 06
+encode_release_packet ret=0
+camera frame 41/100: sequence=45 nv12=4478976 h264=10854 acquire=12.518 ms encode=26.292 ms write=0.112 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=41
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12189 buf_size=1495040 offset=712832 data_num=1 flag=0x00000000 pts=41
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 60 02 c6 02 1f 00 9f 80 2f
+encode_release_packet ret=0
+camera frame 42/100: sequence=46 nv12=4478976 h264=12189 acquire=13.105 ms encode=26.878 ms write=0.123 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=42
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13197 buf_size=1495040 offset=725120 data_num=1 flag=0x00000000 pts=42
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 80 03 06 02 1f 80 2c 2c 44
+encode_release_packet ret=0
+camera frame 43/100: sequence=47 nv12=4478976 h264=13197 acquire=12.511 ms encode=26.354 ms write=0.117 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=43
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13666 buf_size=1495040 offset=738432 data_num=1 flag=0x00000000 pts=43
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 a0 03 46 02 1f 01 fe 01 ce
+encode_release_packet ret=0
+camera frame 44/100: sequence=48 nv12=4478976 h264=13666 acquire=13.039 ms encode=26.848 ms write=0.119 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=44
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13723 buf_size=1495040 offset=752128 data_num=1 flag=0x00000000 pts=44
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 c0 03 86 02 1f 00 9f 80 6a
+encode_release_packet ret=0
+camera frame 45/100: sequence=49 nv12=4478976 h264=13723 acquire=12.545 ms encode=26.298 ms write=0.124 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=45
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13602 buf_size=1495040 offset=765952 data_num=1 flag=0x00000000 pts=45
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 e0 03 c6 02 1f 81 3b c6 16
+encode_release_packet ret=0
+camera frame 46/100: sequence=50 nv12=4478976 h264=13602 acquire=13.106 ms encode=26.822 ms write=0.113 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=46
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=11480 buf_size=1495040 offset=779648 data_num=1 flag=0x00000000 pts=46
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 00 04 06 02 1f 07 e0 4c e8
+encode_release_packet ret=0
+camera frame 47/100: sequence=51 nv12=4478976 h264=11480 acquire=12.575 ms encode=26.621 ms write=0.097 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=47
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=10182 buf_size=1495040 offset=791168 data_num=1 flag=0x00000000 pts=47
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 20 04 46 02 1d c3 e0 b8 41
+encode_release_packet ret=0
+camera frame 48/100: sequence=52 nv12=4478976 h264=10182 acquire=12.789 ms encode=26.821 ms write=0.105 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=48
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12858 buf_size=1495040 offset=801408 data_num=1 flag=0x00000000 pts=48
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 40 04 86 07 7d 81 30 85 af
+encode_release_packet ret=0
+camera frame 49/100: sequence=53 nv12=4478976 h264=12858 acquire=12.594 ms encode=26.268 ms write=0.114 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=49
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=9646 buf_size=1495040 offset=814336 data_num=1 flag=0x00000000 pts=49
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 60 04 c6 07 73 e0 5c 8b 81
+encode_release_packet ret=0
+camera frame 50/100: sequence=54 nv12=4478976 h264=9646 acquire=13.126 ms encode=26.995 ms write=0.111 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=50
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=6310 buf_size=1495040 offset=824064 data_num=1 flag=0x00000000 pts=50
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 80 05 06 07 72 43 fa 84 e4
+encode_release_packet ret=0
+camera frame 51/100: sequence=55 nv12=4478976 h264=6310 acquire=12.409 ms encode=26.267 ms write=0.090 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=51
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=3389 buf_size=1495040 offset=830464 data_num=1 flag=0x00000000 pts=51
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 a0 05 46 07 7e 1e 65 5e ac
+encode_release_packet ret=0
+camera frame 52/100: sequence=56 nv12=4478976 h264=3389 acquire=13.158 ms encode=26.891 ms write=0.009 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=52
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=4310 buf_size=1495040 offset=833920 data_num=1 flag=0x00000000 pts=52
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 c0 05 86 06 71 70 f8 78 79
+encode_release_packet ret=0
+camera frame 53/100: sequence=57 nv12=4478976 h264=4310 acquire=12.614 ms encode=26.309 ms write=0.122 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=53
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=5564 buf_size=1495040 offset=838272 data_num=1 flag=0x00000000 pts=53
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 e0 05 c6 05 70 4f c6 14 90
+encode_release_packet ret=0
+camera frame 54/100: sequence=58 nv12=4478976 h264=5564 acquire=13.090 ms encode=26.928 ms write=0.103 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=54
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=10074 buf_size=1495040 offset=843904 data_num=1 flag=0x00000000 pts=54
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 00 06 06 05 7c 38 04 b1 e5
+encode_release_packet ret=0
+camera frame 55/100: sequence=59 nv12=4478976 h264=10074 acquire=12.483 ms encode=26.539 ms write=0.084 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=55
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=19639 buf_size=1495040 offset=854016 data_num=1 flag=0x00000000 pts=55
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 20 06 46 04 7c 70 35 1a 50
+encode_release_packet ret=0
+camera frame 56/100: sequence=60 nv12=4478976 h264=19639 acquire=12.895 ms encode=26.853 ms write=0.133 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=56
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=21627 buf_size=1495040 offset=873728 data_num=1 flag=0x00000000 pts=56
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 40 06 86 05 7c 38 05 50 91
+encode_release_packet ret=0
+camera frame 57/100: sequence=61 nv12=4478976 h264=21627 acquire=12.532 ms encode=26.267 ms write=0.143 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=57
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=17750 buf_size=1495040 offset=895360 data_num=1 flag=0x00000000 pts=57
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 60 06 c6 07 77 02 84 41 5c
+encode_release_packet ret=0
+camera frame 58/100: sequence=62 nv12=4478976 h264=17750 acquire=13.105 ms encode=26.864 ms write=0.139 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=58
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16360 buf_size=1495040 offset=913152 data_num=1 flag=0x00000000 pts=58
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 80 07 06 07 78 dc 0d 60 00
+encode_release_packet ret=0
+camera frame 59/100: sequence=63 nv12=4478976 h264=16360 acquire=12.515 ms encode=26.419 ms write=0.123 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=59
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15126 buf_size=1495040 offset=929536 data_num=1 flag=0x00000000 pts=59
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 a0 07 46 07 7c 00 92 80 0b
+encode_release_packet ret=0
+camera frame 60/100: sequence=64 nv12=4478976 h264=15126 acquire=12.965 ms encode=26.845 ms write=0.116 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=60
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=52054 buf_size=1495040 offset=944768 data_num=1 flag=0x00000010 pts=60
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 65 b8 00 03 00 00 05 71 12 85 c0 00
+encode_release_packet ret=0
+camera frame 61/100: sequence=65 nv12=4478976 h264=52054 acquire=12.548 ms encode=26.020 ms write=0.229 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=61
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12290 buf_size=1495040 offset=996864 data_num=1 flag=0x00000000 pts=61
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 20 00 46 07 7c 02 f9 18 57
+encode_release_packet ret=0
+camera frame 62/100: sequence=66 nv12=4478976 h264=12290 acquire=13.273 ms encode=26.915 ms write=0.114 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=62
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=14649 buf_size=1495040 offset=1009280 data_num=1 flag=0x00000000 pts=62
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 40 00 86 06 71 9c 60 95 55
+encode_release_packet ret=0
+camera frame 63/100: sequence=67 nv12=4478976 h264=14649 acquire=12.473 ms encode=26.365 ms write=0.114 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=63
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=9435 buf_size=1495040 offset=1024000 data_num=1 flag=0x00000000 pts=63
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 60 00 c6 06 7f 18 25 ef ef
+encode_release_packet ret=0
+camera frame 64/100: sequence=68 nv12=4478976 h264=9435 acquire=13.027 ms encode=26.854 ms write=0.104 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=64
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=11413 buf_size=1495040 offset=1033472 data_num=1 flag=0x00000000 pts=64
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 80 01 06 06 77 00 f7 8b 30
+encode_release_packet ret=0
+camera frame 65/100: sequence=69 nv12=4478976 h264=11413 acquire=12.563 ms encode=26.269 ms write=0.111 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=65
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13947 buf_size=1495040 offset=1044992 data_num=1 flag=0x00000000 pts=65
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 a0 01 46 06 7e 01 66 65 d0
+encode_release_packet ret=0
+camera frame 66/100: sequence=70 nv12=4478976 h264=13947 acquire=13.123 ms encode=27.434 ms write=0.125 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=66
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16297 buf_size=1495040 offset=1058944 data_num=1 flag=0x00000000 pts=66
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 c0 01 86 06 7c 02 7e 01 f6
+encode_release_packet ret=0
+camera frame 67/100: sequence=71 nv12=4478976 h264=16297 acquire=11.988 ms encode=26.245 ms write=0.123 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=67
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=17252 buf_size=1495040 offset=1075328 data_num=1 flag=0x00000000 pts=67
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 e0 01 c6 06 7e 00 81 87 ef
+encode_release_packet ret=0
+camera frame 68/100: sequence=72 nv12=4478976 h264=17252 acquire=13.120 ms encode=26.954 ms write=0.128 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=68
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15599 buf_size=1495040 offset=1092608 data_num=1 flag=0x00000000 pts=68
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 00 02 06 06 7c 02 be 03 98
+encode_release_packet ret=0
+camera frame 69/100: sequence=73 nv12=4478976 h264=15599 acquire=12.424 ms encode=26.339 ms write=0.124 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=69
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13771 buf_size=1495040 offset=1108224 data_num=1 flag=0x00000000 pts=69
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 20 02 46 06 7e 38 a5 4b b8
+encode_release_packet ret=0
+camera frame 70/100: sequence=74 nv12=4478976 h264=13771 acquire=13.058 ms encode=26.891 ms write=0.120 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=70
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=11425 buf_size=1495040 offset=1122048 data_num=1 flag=0x00000000 pts=70
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 40 02 86 06 75 82 60 91 6b
+encode_release_packet ret=0
+camera frame 71/100: sequence=75 nv12=4478976 h264=11425 acquire=12.507 ms encode=26.352 ms write=0.093 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=71
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13279 buf_size=1495040 offset=1133568 data_num=1 flag=0x00000000 pts=71
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 60 02 c6 06 7e 0f a4 c0 fc
+encode_release_packet ret=0
+camera frame 72/100: sequence=76 nv12=4478976 h264=13279 acquire=13.064 ms encode=26.890 ms write=0.114 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=72
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=9986 buf_size=1495040 offset=1146880 data_num=1 flag=0x00000000 pts=72
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 80 03 06 06 7e 1e 1e 55 fa
+encode_release_packet ret=0
+camera frame 73/100: sequence=77 nv12=4478976 h264=9986 acquire=12.518 ms encode=26.251 ms write=0.105 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=73
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=8323 buf_size=1495040 offset=1156992 data_num=1 flag=0x00000000 pts=73
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 a0 03 46 05 72 47 c5 16 b4
+encode_release_packet ret=0
+camera frame 74/100: sequence=78 nv12=4478976 h264=8323 acquire=13.156 ms encode=26.914 ms write=0.104 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=74
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=11070 buf_size=1495040 offset=1165440 data_num=1 flag=0x00000000 pts=74
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 c0 03 86 04 71 b1 f1 85 59
+encode_release_packet ret=0
+camera frame 75/100: sequence=79 nv12=4478976 h264=11070 acquire=12.494 ms encode=26.291 ms write=0.118 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=75
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=7626 buf_size=1495040 offset=1176576 data_num=1 flag=0x00000000 pts=75
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 e0 03 c6 04 73 47 42 55 ed
+encode_release_packet ret=0
+camera frame 76/100: sequence=80 nv12=4478976 h264=7626 acquire=13.111 ms encode=26.875 ms write=0.095 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=76
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13944 buf_size=1495040 offset=1184256 data_num=1 flag=0x00000000 pts=76
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 00 04 06 0d f0 cc 20 53 da
+encode_release_packet ret=0
+camera frame 77/100: sequence=81 nv12=4478976 h264=13944 acquire=12.541 ms encode=26.250 ms write=0.130 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=77
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=18148 buf_size=1495040 offset=1198208 data_num=1 flag=0x00000000 pts=77
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 20 04 46 0d f8 3b 1d d3 a1
+encode_release_packet ret=0
+camera frame 78/100: sequence=82 nv12=4478976 h264=18148 acquire=13.136 ms encode=26.809 ms write=0.135 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=78
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=28263 buf_size=1495040 offset=1216384 data_num=1 flag=0x00000000 pts=78
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 40 04 86 0d fc 65 a7 b8 ad
+encode_release_packet ret=0
+camera frame 79/100: sequence=83 nv12=4478976 h264=28263 acquire=12.575 ms encode=26.406 ms write=0.137 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=79
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=31597 buf_size=1495040 offset=1244672 data_num=1 flag=0x00000000 pts=79
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 60 04 c6 04 7c 22 19 0a 16
+encode_release_packet ret=0
+camera frame 80/100: sequence=84 nv12=4478976 h264=31597 acquire=12.960 ms encode=27.058 ms write=0.161 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=80
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=19819 buf_size=1495040 offset=1276288 data_num=1 flag=0x00000000 pts=80
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 80 05 06 06 78 66 50 2c c0
+encode_release_packet ret=0
+camera frame 81/100: sequence=85 nv12=4478976 h264=19819 acquire=12.294 ms encode=26.292 ms write=0.142 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=81
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16201 buf_size=1495040 offset=1296128 data_num=1 flag=0x00000000 pts=81
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 a0 05 46 07 7c 01 5e 42 85
+encode_release_packet ret=0
+camera frame 82/100: sequence=86 nv12=4478976 h264=16201 acquire=13.076 ms encode=26.854 ms write=0.120 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=82
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=14793 buf_size=1495040 offset=1312384 data_num=1 flag=0x00000000 pts=82
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 c0 05 86 07 7c 00 97 5e 0d
+encode_release_packet ret=0
+camera frame 83/100: sequence=87 nv12=4478976 h264=14793 acquire=12.546 ms encode=26.350 ms write=0.123 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=83
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15514 buf_size=1495040 offset=1327232 data_num=1 flag=0x00000000 pts=83
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 02 e0 05 c6 06 7c 02 d1 10 27
+encode_release_packet ret=0
+camera frame 84/100: sequence=88 nv12=4478976 h264=15514 acquire=13.037 ms encode=26.844 ms write=0.129 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=84
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=14020 buf_size=1495040 offset=1342848 data_num=1 flag=0x00000000 pts=84
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 00 06 06 06 7c 05 15 95 7a
+encode_release_packet ret=0
+camera frame 85/100: sequence=89 nv12=4478976 h264=14020 acquire=12.543 ms encode=26.439 ms write=0.121 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=85
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=12151 buf_size=1495040 offset=1356928 data_num=1 flag=0x00000000 pts=85
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 20 06 46 06 7c 02 a4 04 71
+encode_release_packet ret=0
+camera frame 86/100: sequence=90 nv12=4478976 h264=12151 acquire=12.950 ms encode=26.924 ms write=0.107 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=86
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13227 buf_size=1495040 offset=1369088 data_num=1 flag=0x00000000 pts=86
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 40 06 86 05 72 43 de 33 50
+encode_release_packet ret=0
+camera frame 87/100: sequence=91 nv12=4478976 h264=13227 acquire=12.484 ms encode=26.452 ms write=0.092 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=87
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13772 buf_size=1495040 offset=1382400 data_num=1 flag=0x00000000 pts=87
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 60 06 c6 05 73 43 d9 70 64
+encode_release_packet ret=0
+camera frame 88/100: sequence=92 nv12=4478976 h264=13772 acquire=12.973 ms encode=26.859 ms write=0.120 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=88
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=13357 buf_size=1495040 offset=1396224 data_num=1 flag=0x00000000 pts=88
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 80 07 06 05 73 43 72 95 79
+encode_release_packet ret=0
+camera frame 89/100: sequence=93 nv12=4478976 h264=13357 acquire=12.535 ms encode=26.311 ms write=0.114 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=89
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15202 buf_size=1495040 offset=1409664 data_num=1 flag=0x00000000 pts=89
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 03 a0 07 46 05 7e 03 f3 81 d6
+encode_release_packet ret=0
+camera frame 90/100: sequence=94 nv12=4478976 h264=15202 acquire=13.077 ms encode=26.857 ms write=0.134 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=90
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=65646 buf_size=1495040 offset=1424896 data_num=1 flag=0x00000010 pts=90
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 65 b8 00 01 00 00 03 01 1c 29 28 a0
+encode_release_packet ret=0
+camera frame 91/100: sequence=95 nv12=4478976 h264=65646 acquire=12.531 ms encode=26.037 ms write=0.287 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=91
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=14523 buf_size=1495040 offset=1490560 data_num=1 flag=0x00000000 pts=91
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 20 00 46 06 72 43 b2 09 ef
+encode_release_packet ret=0
+camera frame 92/100: sequence=96 nv12=4478976 h264=14523 acquire=13.190 ms encode=26.922 ms write=0.128 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=92
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15902 buf_size=1495040 offset=10112 data_num=1 flag=0x00000000 pts=92
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 40 00 86 06 7c 02 fe 00 da
+encode_release_packet ret=0
+camera frame 93/100: sequence=97 nv12=4478976 h264=15902 acquire=12.454 ms encode=26.248 ms write=0.124 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=93
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16733 buf_size=1495040 offset=26112 data_num=1 flag=0x00000000 pts=93
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 60 00 c6 06 7c 02 7e 00 a0
+encode_release_packet ret=0
+camera frame 94/100: sequence=98 nv12=4478976 h264=16733 acquire=13.137 ms encode=26.932 ms write=0.127 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=94
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=19241 buf_size=1495040 offset=42880 data_num=1 flag=0x00000000 pts=94
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 80 01 06 06 7e 01 e2 5f 70
+encode_release_packet ret=0
+camera frame 95/100: sequence=99 nv12=4478976 h264=19241 acquire=12.466 ms encode=26.536 ms write=0.101 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=95
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=17542 buf_size=1495040 offset=62208 data_num=1 flag=0x00000000 pts=95
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 a0 01 46 06 7c 02 e8 01 da
+encode_release_packet ret=0
+camera frame 96/100: sequence=100 nv12=4478976 h264=17542 acquire=12.872 ms encode=26.808 ms write=0.127 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=96
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=16419 buf_size=1495040 offset=79872 data_num=1 flag=0x00000000 pts=96
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 c0 01 86 06 7c 3c 82 05 5a
+encode_release_packet ret=0
+camera frame 97/100: sequence=101 nv12=4478976 h264=16419 acquire=12.579 ms encode=26.242 ms write=0.121 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=97
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=15944 buf_size=1495040 offset=96384 data_num=1 flag=0x00000000 pts=97
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 00 e0 01 c6 06 7c 0b e0 e8 20
+encode_release_packet ret=0
+camera frame 98/100: sequence=102 nv12=4478976 h264=15944 acquire=13.154 ms encode=26.874 ms write=0.131 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=98
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=14190 buf_size=1495040 offset=112384 data_num=1 flag=0x00000000 pts=98
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 00 02 06 06 77 82 a2 17 6f
+encode_release_packet ret=0
+camera frame 99/100: sequence=103 nv12=4478976 h264=14190 acquire=12.502 ms encode=26.216 ms write=0.122 ms
+start encode NV12 with RV1106 vendor packet ABI, frame=99
+encode_put_frame ret=0
+encode_get_packet ret=0 handle=0xae9c79a8 expected=0xae9c79a8
+vendor packet: mpi_buf_id=177 len=9801 buf_size=1495040 offset=126592 data_num=1 flag=0x00000000 pts=99
+valloc packet buffer: mpi_buf_id=177 dma_buf_fd=11 size=0
+H264 first bytes: 00 00 00 01 41 e0 01 20 02 46 06 7e 1e 10 5d 76
+encode_release_packet ret=0
+camera frame 100/100: sequence=104 nv12=4478976 h264=9801 acquire=13.183 ms encode=26.871 ms write=0.108 ms
+
+live camera encode summary
+encoded frames      : 100/100
+total H264 bytes    : 1625362
+sequence gaps       : 0 frame(s)
+average acquire wait: 12.807 ms/frame
+average encode time : 26.690 ms/frame
+average write time  : 0.123 ms/frame
+average packet size : 16253.62 bytes/frame
+encode-only speed   : 37.47 fps
+wall-clock time     : 4.011 s
+end-to-end speed    : 24.93 fps
+live H264 saved to  : output_camera_100.h264
