@@ -133,3 +133,7 @@ core.*
 Thumbs.db
 Desktop.ini
 .directory
+
+# Local RTSP source snapshots
+/rtsp/rtsp_media_v*_before_*.c
+/rtsp/rtsp_media_v*_before_*.h

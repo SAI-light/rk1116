@@ -3,113 +3,1062 @@
  *                  All rights reserved.
  *
  *       Filename:  rtsp_media.c
- *    Description:  This file 
- *                 
- *        Version:  1.0.0(07/21/2026)
- *         Author:  Zuo Caimei <zuocaimei@gmail.com>
- *      ChangeLog:  1, Release initial version on "07/21/2026 03:15:26 PM"
- *                 
+ *    Description:  Live camera media source for the RTSP server.
+ *
+ *                  /dev/video11 NV12
+ *                        -> RV1106 MPP H264 access unit in memory
+ *                        -> RTP single NAL / FU-A -> VLC
+ *                        -> Rockchip MP4 muxer    -> local recording
  ********************************************************************************/
 
 #include "rtsp_media.h"
-#include "h264_reader.h"
-#include "h264_rtp.h"
-#include "rtp_sender.h"
 
+#include "h264_annexb.h"
+#include "h264_rtp.h"
+#include "mp4_muxer.h"
+
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <unistd.h>
+#include <string.h>
+#include <time.h>
 
-static RTPSender sender;
+#define RTSP_MEDIA_BUILD_TAG   "live-rtsp-mp4-v2.3-fresh-play-start"
+#define CAMERA_DEVICE          "/dev/video11"
+#define CAPTURE_TIMEOUT_MS     3000
+#define WARMUP_FRAME_COUNT     5
+#define LIVE_MUXER_ID          0
+#define H264_NAL_IDR           5U
+#define H264_NAL_SPS           7U
+#define H264_NAL_PPS           8U
+
+static const uint8_t g_annexb_start_code[4] = {
+    0x00U, 0x00U, 0x00U, 0x01U
+};
+
+static int64_t monotonic_time_us(void)
+{
+    struct timespec ts;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return -1;
+
+    return (int64_t)ts.tv_sec * 1000000LL +
+           (int64_t)ts.tv_nsec / 1000LL;
+}
 
 typedef struct
 {
-	RTSPMedia *media;
-	RTSPSession *session;
-}MediaThreadArgs;
+    RTSPMedia *media;
+    RTSPSession *session;
+} MediaThreadArgs;
 
-int rtsp_media_init(RTSPMedia *media)
+static int record_path_disabled(const char *record_path)
 {
-	media->reader = h264_reader_open("test.h264");
-	if(!media->reader)
-	{
-		printf("open h264 failed\n");
-		return -1;
-	}
-	printf("rtsp media init success\n");
-
-	return 0;
+    return record_path == NULL ||
+           record_path[0] == '\0' ||
+           strcmp(record_path, "-") == 0;
 }
 
-static int media_send_callback(uint8_t *packet, int size)
+static int media_should_run(RTSPMedia *media,
+                            RTSPSession *session)
 {
-	printf("callback enter size=%d\n",size);
-	return rtp_sender_send(&sender, packet, size);
+    int should_run;
+
+    pthread_mutex_lock(&media->lock);
+    should_run = !media->stop_requested && session->playing;
+    pthread_mutex_unlock(&media->lock);
+
+    return should_run;
+}
+
+static int media_rtp_send(void *opaque,
+                          const uint8_t *packet,
+                          int size)
+{
+    RTSPMedia *media = (RTSPMedia *)opaque;
+
+    return rtp_sender_send(&media->sender, packet, size);
+}
+
+static int send_parameter_set(RTSPMedia *media,
+                              const uint8_t *nalu,
+                              size_t nalu_size,
+                              uint16_t *seq,
+                              uint32_t timestamp)
+{
+    if (nalu == NULL || nalu_size == 0U || nalu_size > (size_t)INT_MAX)
+        return -1;
+
+    return h264_rtp_send_nalu_ctx(nalu,
+                                  (int)nalu_size,
+                                  seq,
+                                  timestamp,
+                                  0,
+                                  media_rtp_send,
+                                  media);
+}
+
+static int send_access_unit(RTSPMedia *media,
+                            const uint8_t *access_unit,
+                            size_t access_unit_size,
+                            uint16_t *seq,
+                            uint32_t timestamp,
+                            int prepend_parameter_sets)
+{
+    H264NaluView nalus[H264_ANNEXB_MAX_NALUS];
+    size_t count;
+    size_t i;
+    int packet_count = 0;
+    int has_sps;
+    int has_pps;
+
+    if (h264_annexb_collect(access_unit,
+                            access_unit_size,
+                            nalus,
+                            H264_ANNEXB_MAX_NALUS,
+                            &count) != 0)
+    {
+        printf("invalid Annex-B H264 access unit, size=%zu\n",
+               access_unit_size);
+        return -1;
+    }
+
+    has_sps = h264_annexb_contains_type(access_unit,
+                                        access_unit_size,
+                                        H264_NAL_SPS);
+    has_pps = h264_annexb_contains_type(access_unit,
+                                        access_unit_size,
+                                        H264_NAL_PPS);
+
+    if (prepend_parameter_sets && !has_sps)
+    {
+        int ret = send_parameter_set(media,
+                                     media->sps,
+                                     media->sps_size,
+                                     seq,
+                                     timestamp);
+        if (ret < 0)
+            return -1;
+        packet_count += ret;
+    }
+
+    if (prepend_parameter_sets && !has_pps)
+    {
+        int ret = send_parameter_set(media,
+                                     media->pps,
+                                     media->pps_size,
+                                     seq,
+                                     timestamp);
+        if (ret < 0)
+            return -1;
+        packet_count += ret;
+    }
+
+    for (i = 0U; i < count; ++i)
+    {
+        int marker = (i + 1U == count) ? 1 : 0;
+        int ret;
+
+        if (nalus[i].size > (size_t)INT_MAX)
+            return -1;
+
+        ret = h264_rtp_send_nalu_ctx(nalus[i].data,
+                                     (int)nalus[i].size,
+                                     seq,
+                                     timestamp,
+                                     marker,
+                                     media_rtp_send,
+                                     media);
+        if (ret < 0)
+            return -1;
+
+        packet_count += ret;
+    }
+
+    return packet_count;
+}
+
+static int capture_and_encode(RTSPMedia *media,
+                              uint8_t **h264_data,
+                              int *h264_len,
+                              unsigned int *sequence,
+                              int64_t *capture_timestamp_us)
+{
+    V4L2Frame frame;
+    const size_t expected_size =
+        (size_t)RTSP_MEDIA_WIDTH * (size_t)RTSP_MEDIA_HEIGHT * 3U / 2U;
+    int acquired = 0;
+    int result = -1;
+
+    memset(&frame, 0, sizeof(frame));
+    *h264_data = NULL;
+    *h264_len = -1;
+
+    if (v4l2_capture_acquire_frame(&media->capture,
+                                   &frame,
+                                   CAPTURE_TIMEOUT_MS) < 0)
+    {
+        printf("live capture failed: %s\n", strerror(errno));
+        return -1;
+    }
+    acquired = 1;
+
+    if (frame.size < expected_size)
+    {
+        printf("live frame too small: sequence=%u size=%zu expected=%zu\n",
+               frame.sequence,
+               frame.size,
+               expected_size);
+        goto CLEANUP;
+    }
+
+    *h264_len = mpp_encoder_encode(&media->encoder,
+                                   frame.data,
+                                   (int)expected_size,
+                                   h264_data);
+
+    if (sequence != NULL)
+        *sequence = frame.sequence;
+
+    if (capture_timestamp_us != NULL)
+        *capture_timestamp_us = frame.timestamp_us;
+
+    if (*h264_len <= 0 || *h264_data == NULL)
+    {
+        printf("live encode failed: len=%d data=%p\n",
+               *h264_len,
+               (void *)*h264_data);
+        free(*h264_data);
+        *h264_data = NULL;
+        *h264_len = -1;
+        goto CLEANUP;
+    }
+
+    result = 0;
+
+CLEANUP:
+    if (acquired)
+    {
+        if (v4l2_capture_release_frame(&media->capture, &frame) < 0)
+        {
+            printf("release live camera frame failed\n");
+            free(*h264_data);
+            *h264_data = NULL;
+            *h264_len = -1;
+            result = -1;
+        }
+    }
+
+    return result;
+}
+
+
+static int drain_stale_capture_buffers(RTSPMedia *media,
+                                       unsigned int *drained_count,
+                                       unsigned int *first_sequence,
+                                       unsigned int *last_sequence)
+{
+    unsigned int drained = 0U;
+    unsigned int first = 0U;
+    unsigned int last = 0U;
+    unsigned int i;
+
+    if (media == NULL)
+        return -1;
+
+    /*
+     * While the RTSP server waits for PLAY, the four MMAP buffers can already
+     * contain old frames. Drain at most the configured buffer count so the
+     * first frame used by the live session is captured after PLAY.
+     */
+    for (i = 0U; i < media->capture.buffer_count; ++i)
+    {
+        V4L2Frame frame;
+
+        memset(&frame, 0, sizeof(frame));
+
+        if (v4l2_capture_acquire_frame(&media->capture,
+                                       &frame,
+                                       0) < 0)
+        {
+            if (errno == EAGAIN || errno == ETIMEDOUT)
+                break;
+
+            printf("drain stale camera buffer failed: %s\n",
+                   strerror(errno));
+            return -1;
+        }
+
+        if (drained == 0U)
+            first = frame.sequence;
+
+        last = frame.sequence;
+        ++drained;
+
+        if (v4l2_capture_release_frame(&media->capture, &frame) < 0)
+        {
+            printf("release stale camera buffer failed\n");
+            return -1;
+        }
+    }
+
+    if (drained_count != NULL)
+        *drained_count = drained;
+
+    if (first_sequence != NULL)
+        *first_sequence = first;
+
+    if (last_sequence != NULL)
+        *last_sequence = last;
+
+    return 0;
+}
+
+static int prepare_bootstrap_access_unit(RTSPMedia *media)
+{
+    uint8_t *h264_data = NULL;
+    int h264_len = -1;
+    unsigned int sequence = 0U;
+
+    if (capture_and_encode(media,
+                           &h264_data,
+                           &h264_len,
+                           &sequence,
+                           NULL) != 0)
+    {
+        return -1;
+    }
+
+    if (!h264_annexb_contains_type(h264_data,
+                                   (size_t)h264_len,
+                                   H264_NAL_IDR))
+    {
+        printf("first live H264 access unit has no IDR\n");
+        free(h264_data);
+        return -1;
+    }
+
+    if (h264_annexb_copy_parameter_sets(h264_data,
+                                        (size_t)h264_len,
+                                        &media->sps,
+                                        &media->sps_size,
+                                        &media->pps,
+                                        &media->pps_size) != 0)
+    {
+        printf("extract live SPS/PPS failed\n");
+        free(h264_data);
+        return -1;
+    }
+
+    media->bootstrap_au = h264_data;
+    media->bootstrap_au_size = (size_t)h264_len;
+    media->bootstrap_sequence = sequence;
+    media->bootstrap_consumed = 0;
+
+    printf("live bootstrap ready: sequence=%u au=%d sps=%zu pps=%zu\n",
+           sequence,
+           h264_len,
+           media->sps_size,
+           media->pps_size);
+
+    return 0;
+}
+
+static int build_complete_mp4_start_au(RTSPMedia *media,
+                                       const uint8_t *access_unit,
+                                       size_t access_unit_size,
+                                       uint8_t **owned_buffer,
+                                       const uint8_t **write_data,
+                                       size_t *write_size)
+{
+    size_t total_size;
+    size_t offset = 0U;
+    uint8_t *buffer;
+    int has_sps;
+    int has_pps;
+
+    if (media == NULL || access_unit == NULL || access_unit_size == 0U ||
+        owned_buffer == NULL || write_data == NULL || write_size == NULL)
+    {
+        return -1;
+    }
+
+    *owned_buffer = NULL;
+    *write_data = access_unit;
+    *write_size = access_unit_size;
+
+    if (!h264_annexb_contains_type(access_unit,
+                                   access_unit_size,
+                                   H264_NAL_IDR))
+    {
+        printf("first recording access unit has no IDR\n");
+        return -1;
+    }
+
+    has_sps = h264_annexb_contains_type(access_unit,
+                                        access_unit_size,
+                                        H264_NAL_SPS);
+    has_pps = h264_annexb_contains_type(access_unit,
+                                        access_unit_size,
+                                        H264_NAL_PPS);
+
+    if (has_sps && has_pps)
+        return 0;
+
+    if (media->sps == NULL || media->sps_size == 0U ||
+        media->pps == NULL || media->pps_size == 0U)
+    {
+        printf("cannot prepend SPS/PPS to first recording frame\n");
+        return -1;
+    }
+
+    if (media->sps_size > SIZE_MAX - sizeof(g_annexb_start_code) ||
+        media->pps_size > SIZE_MAX - sizeof(g_annexb_start_code))
+    {
+        return -1;
+    }
+
+    total_size = sizeof(g_annexb_start_code) + media->sps_size;
+    if (total_size > SIZE_MAX - sizeof(g_annexb_start_code) -
+                     media->pps_size)
+    {
+        return -1;
+    }
+    total_size += sizeof(g_annexb_start_code) + media->pps_size;
+
+    if (total_size > SIZE_MAX - access_unit_size)
+        return -1;
+    total_size += access_unit_size;
+
+    buffer = (uint8_t *)malloc(total_size);
+    if (buffer == NULL)
+        return -1;
+
+    memcpy(buffer + offset,
+           g_annexb_start_code,
+           sizeof(g_annexb_start_code));
+    offset += sizeof(g_annexb_start_code);
+
+    memcpy(buffer + offset, media->sps, media->sps_size);
+    offset += media->sps_size;
+
+    memcpy(buffer + offset,
+           g_annexb_start_code,
+           sizeof(g_annexb_start_code));
+    offset += sizeof(g_annexb_start_code);
+
+    memcpy(buffer + offset, media->pps, media->pps_size);
+    offset += media->pps_size;
+
+    memcpy(buffer + offset, access_unit, access_unit_size);
+
+    *owned_buffer = buffer;
+    *write_data = buffer;
+    *write_size = total_size;
+
+    printf("prepended SPS/PPS for first MP4 frame: original=%zu complete=%zu\n",
+           access_unit_size,
+           total_size);
+
+    return 0;
+}
+
+static int write_mp4_access_unit(RTSPMedia *media,
+                                 Mp4Muxer *muxer,
+                                 const uint8_t *access_unit,
+                                 size_t access_unit_size,
+                                 uint64_t recording_frame_index)
+{
+    uint8_t *owned_buffer = NULL;
+    const uint8_t *write_data = access_unit;
+    size_t write_size = access_unit_size;
+    int64_t pts_us;
+    int ret;
+
+    if (recording_frame_index == 0U)
+    {
+        if (build_complete_mp4_start_au(media,
+                                        access_unit,
+                                        access_unit_size,
+                                        &owned_buffer,
+                                        &write_data,
+                                        &write_size) != 0)
+        {
+            return -1;
+        }
+    }
+
+    pts_us = (int64_t)(recording_frame_index * 1000000ULL /
+                       (uint64_t)RTSP_MEDIA_FPS);
+
+    ret = mp4_muxer_write_h264(muxer,
+                               write_data,
+                               write_size,
+                               pts_us,
+                               NULL);
+
+    free(owned_buffer);
+    return ret;
+}
+
+int rtsp_media_init(RTSPMedia *media,
+                    const char *record_path)
+{
+    V4L2Frame frame;
+    int i;
+
+    if (media == NULL)
+        return -1;
+
+    memset(media, 0, sizeof(*media));
+    media->capture.fd = -1;
+    media->sender.sockfd = -1;
+
+    if (!record_path_disabled(record_path))
+    {
+        int len = snprintf(media->record_path,
+                           sizeof(media->record_path),
+                           "%s",
+                           record_path);
+
+        if (len < 0 || len >= (int)sizeof(media->record_path))
+        {
+            printf("record path is too long\n");
+            return -1;
+        }
+
+        media->recording_enabled = 1;
+    }
+
+    if (pthread_mutex_init(&media->lock, NULL) != 0)
+    {
+        printf("media mutex init failed\n");
+        return -1;
+    }
+    media->lock_initialized = 1;
+
+    if (v4l2_capture_init(&media->capture,
+                          CAMERA_DEVICE,
+                          RTSP_MEDIA_WIDTH,
+                          RTSP_MEDIA_HEIGHT) < 0)
+    {
+        printf("live capture init failed\n");
+        goto FAIL;
+    }
+    media->capture_initialized = 1;
+
+    if (media->capture.width != RTSP_MEDIA_WIDTH ||
+        media->capture.height != RTSP_MEDIA_HEIGHT ||
+        media->capture.bytesperline != RTSP_MEDIA_WIDTH)
+    {
+        printf("unsupported camera format: size=%dx%d stride=%d\n",
+               media->capture.width,
+               media->capture.height,
+               media->capture.bytesperline);
+        goto FAIL;
+    }
+
+    memset(&frame, 0, sizeof(frame));
+    for (i = 0; i < WARMUP_FRAME_COUNT; ++i)
+    {
+        if (v4l2_capture_acquire_frame(&media->capture,
+                                       &frame,
+                                       CAPTURE_TIMEOUT_MS) < 0)
+        {
+            printf("warmup frame %d failed\n", i);
+            goto FAIL;
+        }
+
+        printf("RTSP warmup frame %d/%d sequence=%u size=%zu\n",
+               i + 1,
+               WARMUP_FRAME_COUNT,
+               frame.sequence,
+               frame.size);
+
+        if (v4l2_capture_release_frame(&media->capture, &frame) < 0)
+        {
+            printf("warmup frame %d release failed\n", i);
+            goto FAIL;
+        }
+    }
+
+    if (mpp_encoder_init_ex(&media->encoder,
+                            RTSP_MEDIA_WIDTH,
+                            RTSP_MEDIA_HEIGHT,
+                            RTSP_MEDIA_FPS,
+                            RTSP_MEDIA_GOP,
+                            RTSP_MEDIA_BIT_RATE) < 0)
+    {
+        printf("live MPP encoder init failed\n");
+        goto FAIL;
+    }
+    media->encoder_initialized = 1;
+
+    if (prepare_bootstrap_access_unit(media) != 0)
+        goto FAIL;
+
+    media->initialized = 1;
+
+    printf("RTSP media build: %s\n", RTSP_MEDIA_BUILD_TAG);
+    printf("RTSP live media init success: %dx%d %dfps GOP=%d bitrate=%d\n",
+           RTSP_MEDIA_WIDTH,
+           RTSP_MEDIA_HEIGHT,
+           RTSP_MEDIA_FPS,
+           RTSP_MEDIA_GOP,
+           RTSP_MEDIA_BIT_RATE);
+
+    if (media->recording_enabled)
+        printf("live MP4 recording enabled: %s\n", media->record_path);
+    else
+        printf("live MP4 recording disabled\n");
+
+    return 0;
+
+FAIL:
+    rtsp_media_close(media);
+    return -1;
 }
 
 static void *media_thread(void *arg)
 {
-	MediaThreadArgs *args =(MediaThreadArgs *)arg;
-	RTSPMedia *media = args->media;
-	RTSPSession *session = args->session;
+    MediaThreadArgs *args = (MediaThreadArgs *)arg;
+    RTSPMedia *media = args->media;
+    RTSPSession *session = args->session;
+    Mp4Muxer muxer;
+    uint16_t seq = 100U;
+    uint32_t timestamp = 0U;
+    const uint32_t timestamp_step =
+        (uint32_t)(RTSP_MEDIA_RTP_CLOCK / RTSP_MEDIA_FPS);
+    uint64_t recording_frame_count = 0U;
+    unsigned int frame_count = 0U;
+    unsigned int sequence_gap_count = 0U;
+    unsigned int last_capture_sequence = 0U;
+    unsigned int first_live_sequence = 0U;
+    unsigned int last_live_sequence = 0U;
+    int64_t first_live_capture_timestamp_us = -1;
+    int64_t last_live_capture_timestamp_us = -1;
+    int64_t stream_start_us = -1;
+    int64_t stream_end_us = -1;
+    int sequence_initialized = 0;
+    int muxer_initialized = 0;
+    int waiting_for_idr;
 
-	printf("media thread start\n");
+    free(args);
+    memset(&muxer, 0, sizeof(muxer));
 
-	H264Reader *reader = media->reader;
+    printf("live media thread start: client=%s:%d local_rtp=%d ts_step=%u\n",
+           session->client_ip,
+           session->client_rtp_port,
+           session->server_rtp_port,
+           timestamp_step);
 
-	if(rtp_sender_init(&sender, session->client_ip, session->client_rtp_port) < 0)
-	{
-		return NULL;
-	}
+    if (rtp_sender_init_ex(&media->sender,
+                           session->server_rtp_port,
+                           session->client_ip,
+                           session->client_rtp_port) < 0)
+    {
+        printf("live RTP sender init failed\n");
+        goto EXIT;
+    }
 
-	uint16_t seq=100;
-	uint32_t timestamp=0;
+    if (media->recording_enabled)
+    {
+        if (mp4_muxer_init(&muxer,
+                           LIVE_MUXER_ID,
+                           media->record_path,
+                           RTSP_MEDIA_WIDTH,
+                           RTSP_MEDIA_HEIGHT,
+                           RTSP_MEDIA_FPS,
+                           RTSP_MEDIA_BIT_RATE) != 0)
+        {
+            printf("live MP4 muxer init failed: %s\n",
+                   media->record_path);
+            goto EXIT;
+        }
 
-	while(session->playing)
-	{
-		H264NALU nalu;
-		if(h264_reader_read(reader, &nalu)<=0)
-		{
-			printf("loop h264 file\n");
-			h264_reader_close(reader);
-			reader = h264_reader_open("test.h264");
-			if(reader == NULL)
-			{
-				break;
-			}
-			continue;
-		}
-		printf("send nalu type=%d size=%d\n", nalu.type, nalu.size);
+        muxer_initialized = 1;
+        printf("live MP4 recording started: %s\n",
+               media->record_path);
+    }
 
-		h264_rtp_send_nalu(nalu.data, nalu.size, &seq, timestamp, media_send_callback);
+    waiting_for_idr = 1;
 
-		timestamp += 3000;
-		free(nalu.data);
-		usleep(40000);
-	}
+    {
+        unsigned int drained_count = 0U;
+        unsigned int drained_first = 0U;
+        unsigned int drained_last = 0U;
 
-	free(args);
-	rtp_sender_close(&sender);
-	return NULL;
+        if (drain_stale_capture_buffers(media,
+                                        &drained_count,
+                                        &drained_first,
+                                        &drained_last) != 0)
+        {
+            goto EXIT;
+        }
+
+        if (drained_count > 0U)
+        {
+            printf("discarded stale camera buffers at PLAY: "
+                   "count=%u sequence=%u -> %u\n",
+                   drained_count,
+                   drained_first,
+                   drained_last);
+        }
+        else
+        {
+            printf("no stale camera buffer queued at PLAY\n");
+        }
+    }
+
+    /*
+     * The bootstrap access unit is captured before the RTSP server starts
+     * accepting clients. Its SPS/PPS remain valid for SDP, but the old picture
+     * itself must not be sent or recorded after a long wait for PLAY.
+     *
+     * Start both RTP and MP4 from the next fresh IDR generated after PLAY.
+     */
+    pthread_mutex_lock(&media->lock);
+    media->bootstrap_consumed = 1;
+    pthread_mutex_unlock(&media->lock);
+
+    printf("bootstrap access unit used for SDP only; "
+           "waiting for a fresh IDR\n");
+
+    stream_start_us = monotonic_time_us();
+
+    while (media_should_run(media, session))
+    {
+        uint8_t *h264_data = NULL;
+        int h264_len = -1;
+        unsigned int capture_sequence = 0U;
+        int64_t capture_timestamp_us = -1;
+        int is_idr;
+        int prepend_parameter_sets = 0;
+        int packet_count;
+
+        if (capture_and_encode(media,
+                               &h264_data,
+                               &h264_len,
+                               &capture_sequence,
+                               &capture_timestamp_us) != 0)
+        {
+            break;
+        }
+
+        if (!sequence_initialized)
+        {
+            unsigned int idle_skipped = 0U;
+
+            if (capture_sequence > media->bootstrap_sequence)
+            {
+                idle_skipped = capture_sequence -
+                               media->bootstrap_sequence - 1U;
+            }
+
+            printf("fresh live sequence baseline: bootstrap=%u "
+                   "first_live=%u preplay_skipped=%u capture_ts=%lld us\n",
+                   media->bootstrap_sequence,
+                   capture_sequence,
+                   idle_skipped,
+                   (long long)capture_timestamp_us);
+
+            first_live_sequence = capture_sequence;
+            first_live_capture_timestamp_us = capture_timestamp_us;
+            sequence_initialized = 1;
+        }
+        else
+        {
+            unsigned int expected = last_capture_sequence + 1U;
+
+            if (capture_sequence != expected)
+            {
+                if (capture_sequence > expected)
+                {
+                    unsigned int gap = capture_sequence - expected;
+                    sequence_gap_count += gap;
+                    printf("live capture sequence gap: previous=%u "
+                           "current=%u missing=%u\n",
+                           last_capture_sequence,
+                           capture_sequence,
+                           gap);
+                }
+                else
+                {
+                    printf("live capture sequence reset/discontinuity: "
+                           "previous=%u current=%u expected=%u\n",
+                           last_capture_sequence,
+                           capture_sequence,
+                           expected);
+                }
+            }
+        }
+        last_capture_sequence = capture_sequence;
+        last_live_sequence = capture_sequence;
+        last_live_capture_timestamp_us = capture_timestamp_us;
+
+        is_idr = h264_annexb_contains_type(h264_data,
+                                           (size_t)h264_len,
+                                           H264_NAL_IDR);
+
+        if (waiting_for_idr && !is_idr)
+        {
+            free(h264_data);
+            continue;
+        }
+
+        if (waiting_for_idr && is_idr)
+        {
+            prepend_parameter_sets = 1;
+            waiting_for_idr = 0;
+        }
+
+        if (muxer_initialized &&
+            write_mp4_access_unit(media,
+                                  &muxer,
+                                  h264_data,
+                                  (size_t)h264_len,
+                                  recording_frame_count) != 0)
+        {
+            printf("write live access unit to MP4 failed: frame=%llu\n",
+                   (unsigned long long)recording_frame_count);
+            free(h264_data);
+            break;
+        }
+
+        packet_count = send_access_unit(media,
+                                        h264_data,
+                                        (size_t)h264_len,
+                                        &seq,
+                                        timestamp,
+                                        prepend_parameter_sets);
+        free(h264_data);
+
+        if (packet_count < 0)
+        {
+            printf("send live access unit failed\n");
+            break;
+        }
+
+        ++frame_count;
+        if (muxer_initialized)
+            ++recording_frame_count;
+
+        if (is_idr || frame_count == 1U || frame_count % 25U == 0U)
+        {
+            printf("RTP+MP4 live frame=%u capture_sequence=%u idr=%d "
+                   "timestamp=%u packets=%d next_seq=%u recorded=%llu\n",
+                   frame_count,
+                   capture_sequence,
+                   is_idr,
+                   timestamp,
+                   packet_count,
+                   seq,
+                   (unsigned long long)recording_frame_count);
+        }
+
+        timestamp += timestamp_step;
+    }
+
+EXIT:
+    stream_end_us = monotonic_time_us();
+    rtp_sender_close(&media->sender);
+
+    if (muxer_initialized)
+    {
+        if (mp4_muxer_close(&muxer) != 0)
+            printf("close live MP4 muxer failed\n");
+        else
+            printf("live MP4 recording finalized: %s\n",
+                   media->record_path);
+    }
+
+    pthread_mutex_lock(&media->lock);
+    session->playing = 0;
+    pthread_mutex_unlock(&media->lock);
+
+    {
+        double wall_seconds = 0.0;
+        double pipeline_fps = 0.0;
+        double timeline_seconds =
+            (double)recording_frame_count / (double)RTSP_MEDIA_FPS;
+        double capture_seconds = 0.0;
+        double source_sequence_rate = 0.0;
+        unsigned int live_frames = frame_count;
+
+        if (stream_start_us >= 0 &&
+            stream_end_us >= stream_start_us)
+        {
+            wall_seconds =
+                (double)(stream_end_us - stream_start_us) / 1000000.0;
+        }
+
+        if (wall_seconds > 0.0)
+            pipeline_fps = (double)frame_count / wall_seconds;
+
+        if (first_live_capture_timestamp_us >= 0 &&
+            last_live_capture_timestamp_us >
+                first_live_capture_timestamp_us)
+        {
+            capture_seconds =
+                (double)(last_live_capture_timestamp_us -
+                         first_live_capture_timestamp_us) / 1000000.0;
+
+            source_sequence_rate =
+                (double)(last_live_sequence - first_live_sequence) /
+                capture_seconds;
+        }
+
+        printf("live media performance summary\n");
+        printf("processed frames      : %u\n", frame_count);
+        printf("recorded frames       : %llu\n",
+               (unsigned long long)recording_frame_count);
+        printf("live captured frames  : %u\n", live_frames);
+        printf("sequence gaps         : %u\n", sequence_gap_count);
+        printf("capture sequence range: %u -> %u\n",
+               first_live_sequence,
+               last_live_sequence);
+        printf("MP4 timeline duration : %.3f s\n", timeline_seconds);
+        printf("session wall duration : %.3f s\n", wall_seconds);
+        printf("pipeline throughput   : %.2f fps\n", pipeline_fps);
+
+        if (capture_seconds > 0.0)
+        {
+            printf("capture timestamp span: %.3f s\n", capture_seconds);
+            printf("source sequence rate  : %.2f sequence/s\n",
+                   source_sequence_rate);
+        }
+
+        printf("live media thread exit: frames=%u recorded=%llu "
+               "sequence_gaps=%u\n",
+               frame_count,
+               (unsigned long long)recording_frame_count,
+               sequence_gap_count);
+    }
+    return NULL;
 }
 
-int rtsp_media_start(RTSPMedia *media, RTSPSession *session)
+int rtsp_media_start(RTSPMedia *media,
+                     RTSPSession *session)
 {
-	pthread_t tid;
-	MediaThreadArgs *args = malloc(sizeof(MediaThreadArgs));
-	args->media = media;
-	args->session = session;
-	session->playing=1;
+    MediaThreadArgs *args;
+    int ret;
 
-	pthread_create(&tid, NULL, media_thread, args);
-	pthread_detach(tid);
+    if (media == NULL || session == NULL || !media->initialized ||
+        session->client_ip[0] == '\0' ||
+        session->client_rtp_port <= 0)
+    {
+        return -1;
+    }
 
-	return 0;
+    pthread_mutex_lock(&media->lock);
+
+    if (media->thread_running)
+    {
+        pthread_mutex_unlock(&media->lock);
+        printf("media thread is already running\n");
+        return 0;
+    }
+
+    media->stop_requested = 0;
+    session->playing = 1;
+    media->thread_running = 1;
+
+    pthread_mutex_unlock(&media->lock);
+
+    args = (MediaThreadArgs *)malloc(sizeof(*args));
+    if (args == NULL)
+        goto FAIL;
+
+    args->media = media;
+    args->session = session;
+
+    ret = pthread_create(&media->thread, NULL, media_thread, args);
+    if (ret != 0)
+    {
+        printf("create media thread failed: %s\n", strerror(ret));
+        free(args);
+        goto FAIL;
+    }
+
+    return 0;
+
+FAIL:
+    pthread_mutex_lock(&media->lock);
+    media->thread_running = 0;
+    media->stop_requested = 1;
+    session->playing = 0;
+    pthread_mutex_unlock(&media->lock);
+    return -1;
 }
 
-int rtsp_media_stop(RTSPMedia *media, RTSPSession *session)
+int rtsp_media_stop(RTSPMedia *media,
+                    RTSPSession *session)
 {
-	session->playing=0;
-	return 0;
+    int should_join;
+
+    if (media == NULL)
+        return -1;
+
+    pthread_mutex_lock(&media->lock);
+    media->stop_requested = 1;
+    if (session != NULL)
+        session->playing = 0;
+    should_join = media->thread_running;
+    pthread_mutex_unlock(&media->lock);
+
+    if (should_join)
+    {
+        pthread_join(media->thread, NULL);
+
+        pthread_mutex_lock(&media->lock);
+        media->thread_running = 0;
+        pthread_mutex_unlock(&media->lock);
+    }
+
+    return 0;
+}
+
+void rtsp_media_close(RTSPMedia *media)
+{
+    if (media == NULL)
+        return;
+
+    if (media->lock_initialized)
+        (void)rtsp_media_stop(media, NULL);
+
+    rtp_sender_close(&media->sender);
+
+    free(media->bootstrap_au);
+    media->bootstrap_au = NULL;
+    media->bootstrap_au_size = 0U;
+
+    free(media->sps);
+    media->sps = NULL;
+    media->sps_size = 0U;
+
+    free(media->pps);
+    media->pps = NULL;
+    media->pps_size = 0U;
+
+    if (media->encoder_initialized)
+    {
+        mpp_encoder_close(&media->encoder);
+        media->encoder_initialized = 0;
+    }
+
+    if (media->capture_initialized)
+    {
+        v4l2_capture_close(&media->capture);
+        media->capture_initialized = 0;
+    }
+
+    media->initialized = 0;
+
+    if (media->lock_initialized)
+    {
+        pthread_mutex_destroy(&media->lock);
+        media->lock_initialized = 0;
+    }
 }

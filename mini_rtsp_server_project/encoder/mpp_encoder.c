@@ -40,11 +40,22 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define MPP_ENCODER_BUILD_TAG      "vendor-packet-v9.1-ring-boundary"
+#define MPP_ENCODER_BUILD_TAG      "vendor-packet-v9.2-quiet-runtime"
 #define VALLOC_DEVICE              "/dev/mpi/valloc"
 #define DEFAULT_ENCODER_FPS        30
 #define DEFAULT_ENCODER_GOP        30
 #define DEFAULT_ENCODER_BIT_RATE   4000000
+
+#ifndef MPP_ENCODER_FRAME_DEBUG
+#define MPP_ENCODER_FRAME_DEBUG    0
+#endif
+
+#define MPP_FRAME_LOG(...)                                              \
+    do                                                                  \
+    {                                                                   \
+        if (MPP_ENCODER_FRAME_DEBUG)                                    \
+            printf(__VA_ARGS__);                                        \
+    } while (0)
 
 static size_t align_up_size(size_t value, size_t alignment)
 {
@@ -165,20 +176,20 @@ static int copy_vendor_packet(const struct venc_packet *packet,
     buffer_size = (size_t)packet->buf_size;
     offset = (size_t)packet->offset;
 
-    printf("vendor packet: mpi_buf_id=%" PRIu32
-           " len=%" PRIu32
-           " buf_size=%" PRIu32
-           " offset=%" PRIu32
-           " data_num=%" PRIu32
-           " flag=0x%08" PRIx32
-           " pts=%" PRIu64 "\n",
-           (RK_U32)packet->u64priv_data,
-           packet->len,
-           packet->buf_size,
-           packet->offset,
-           packet->data_num,
-           packet->flag,
-           (uint64_t)packet->u64pts);
+    MPP_FRAME_LOG("vendor packet: mpi_buf_id=%" PRIu32
+                  " len=%" PRIu32
+                  " buf_size=%" PRIu32
+                  " offset=%" PRIu32
+                  " data_num=%" PRIu32
+                  " flag=0x%08" PRIx32
+                  " pts=%" PRIu64 "\n",
+                  (RK_U32)packet->u64priv_data,
+                  packet->len,
+                  packet->buf_size,
+                  packet->offset,
+                  packet->data_num,
+                  packet->flag,
+                  (uint64_t)packet->u64pts);
 
     if (packet_len == 0U || buffer_size == 0U)
     {
@@ -233,8 +244,9 @@ static int copy_vendor_packet(const struct venc_packet *packet,
         goto CLEANUP;
     }
 
-    printf("valloc packet buffer: mpi_buf_id=%d dma_buf_fd=%d size=%d\n",
-           mb.mpi_buf_id, dma_fd, mb.size);
+    MPP_FRAME_LOG("valloc packet buffer: mpi_buf_id=%d "
+                  "dma_buf_fd=%d size=%d\n",
+                  mb.mpi_buf_id, dma_fd, mb.size);
 
     mapped = (uint8_t *)mmap(NULL,
                              buffer_size,
@@ -264,7 +276,8 @@ static int copy_vendor_packet(const struct venc_packet *packet,
     if (packet_len > first_part)
         memcpy(result + first_part, mapped, packet_len - first_part);
 
-    print_first_bytes(result, packet_len);
+    if (MPP_ENCODER_FRAME_DEBUG)
+        print_first_bytes(result, packet_len);
 
     *out = result;
     result = NULL;
@@ -520,28 +533,35 @@ int mpp_encoder_encode(MppEncoder *encoder,
     mpp_frame_set_eos(frame, 0);
     mpp_frame_set_buffer(frame, encoder->frm_buf);
 
-    printf("start encode NV12 with RV1106 vendor packet ABI, frame=%" PRId64 "\n",
-           encoder->frame_index - 1);
+    MPP_FRAME_LOG("start encode NV12 with RV1106 vendor packet ABI, "
+                  "frame=%" PRId64 "\n",
+                  encoder->frame_index - 1);
 
     ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
-    printf("encode_put_frame ret=%d\n", ret);
+    MPP_FRAME_LOG("encode_put_frame ret=%d\n", ret);
 
     /* Official mpi_enc_test releases the input frame immediately after put. */
     mpp_frame_deinit(&frame);
     frame = NULL;
 
     if (ret != MPP_OK)
+    {
+        printf("encode_put_frame failed ret=%d\n", ret);
         goto CLEANUP;
+    }
 
     memset(&vendor_packet, 0, sizeof(vendor_packet));
     packet_handle = (MppPacket)&vendor_packet;
 
     ret = encoder->mpi->encode_get_packet(encoder->ctx, &packet_handle);
-    printf("encode_get_packet ret=%d handle=%p expected=%p\n",
-           ret, packet_handle, (void *)&vendor_packet);
+    MPP_FRAME_LOG("encode_get_packet ret=%d handle=%p expected=%p\n",
+                  ret, packet_handle, (void *)&vendor_packet);
 
     if (ret != MPP_OK)
+    {
+        printf("encode_get_packet failed ret=%d\n", ret);
         goto CLEANUP;
+    }
 
     packet_acquired = 1;
 
@@ -566,7 +586,7 @@ RELEASE_PACKET:
         {
             ret = encoder->mpi->encode_release_packet(encoder->ctx,
                                                        &packet_handle);
-            printf("encode_release_packet ret=%d\n", ret);
+            MPP_FRAME_LOG("encode_release_packet ret=%d\n", ret);
             if (ret != MPP_OK)
             {
                 free(*out);
