@@ -3,70 +3,141 @@
  *                  All rights reserved.
  *
  *       Filename:  rtp_sender.c
- *    Description:  This file 
- *                 
- *        Version:  1.0.0(07/17/2026)
- *         Author:  Zuo Caimei <zuocaimei@gmail.com>
- *      ChangeLog:  1, Release initial version on "07/17/2026 11:11:21 PM"
- *                 
+ *    Description:  UDP RTP sender with optional fixed local port.
  ********************************************************************************/
 
 #include "rtp_sender.h"
+
+#include <arpa/inet.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 int rtp_sender_init(RTPSender *sender, const char *ip, int port)
 {
-	memset(sender,0,sizeof(RTPSender));
-	sender->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	printf("sockfd=%d\n",sender->sockfd);
-	if(sender->sockfd <0)
-	{
-		perror("socket");
-		return -1;
-	}
-
-	strcpy(sender->ip,ip);
-	sender->port=port;
-	printf("RTP sender init %s:%d\n", ip, port);
-
-	return 0;
+    return rtp_sender_init_ex(sender, 0, ip, port);
 }
 
-int rtp_sender_send(RTPSender *sender, uint8_t *packet, int size)
+int rtp_sender_init_ex(RTPSender *sender,
+                       int local_port,
+                       const char *ip,
+                       int port)
 {
-	printf("rtp_sender_send enter\n");
-	struct sockaddr_in addr;
-	memset(&addr,0,sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(sender->port);
-	addr.sin_addr.s_addr = inet_addr(sender->ip);
+    int reuse = 1;
 
-	int ret = sendto(sender->sockfd, packet, size, 0, (struct sockaddr*)&addr, sizeof(addr));
-	printf(
-			"sendto ret=%d size=%d ip=%s port=%d\n",
-			ret,
-			size,
-			sender->ip,
-			sender->port
-		  );
+    if (sender == NULL || ip == NULL ||
+        port <= 0 || port > 65535 ||
+        local_port < 0 || local_port > 65535)
+    {
+        return -1;
+    }
 
-	if(ret <0)
-	{
-		perror("sendto");
-		return -1;
-	}
+    memset(sender, 0, sizeof(*sender));
+    sender->sockfd = -1;
 
-	return ret;
+    sender->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sender->sockfd < 0)
+    {
+        perror("RTP socket");
+        return -1;
+    }
+
+    (void)setsockopt(sender->sockfd,
+                     SOL_SOCKET,
+                     SO_REUSEADDR,
+                     &reuse,
+                     sizeof(reuse));
+
+    if (local_port > 0)
+    {
+        struct sockaddr_in local_addr;
+
+        memset(&local_addr, 0, sizeof(local_addr));
+        local_addr.sin_family = AF_INET;
+        local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        local_addr.sin_port = htons((uint16_t)local_port);
+
+        if (bind(sender->sockfd,
+                 (struct sockaddr *)&local_addr,
+                 sizeof(local_addr)) < 0)
+        {
+            printf("bind RTP local port %d failed: %s\n",
+                   local_port,
+                   strerror(errno));
+            rtp_sender_close(sender);
+            return -1;
+        }
+    }
+
+    memset(&sender->remote_addr, 0, sizeof(sender->remote_addr));
+    sender->remote_addr.sin_family = AF_INET;
+    sender->remote_addr.sin_port = htons((uint16_t)port);
+
+    if (inet_pton(AF_INET,
+                  ip,
+                  &sender->remote_addr.sin_addr) != 1)
+    {
+        printf("invalid RTP destination IP: %s\n", ip);
+        rtp_sender_close(sender);
+        return -1;
+    }
+
+    snprintf(sender->ip, sizeof(sender->ip), "%s", ip);
+    sender->port = port;
+    sender->local_port = local_port;
+
+    printf("RTP sender init local=%d remote=%s:%d sockfd=%d\n",
+           local_port,
+           sender->ip,
+           sender->port,
+           sender->sockfd);
+
+    return 0;
+}
+
+int rtp_sender_send(RTPSender *sender,
+                    const uint8_t *packet,
+                    int size)
+{
+    int ret;
+
+    if (sender == NULL || sender->sockfd < 0 ||
+        packet == NULL || size <= 0)
+    {
+        return -1;
+    }
+
+    ret = (int)sendto(sender->sockfd,
+                      packet,
+                      (size_t)size,
+                      0,
+                      (struct sockaddr *)&sender->remote_addr,
+                      sizeof(sender->remote_addr));
+
+    if (ret < 0)
+    {
+        perror("RTP sendto");
+        return -1;
+    }
+
+    if (ret != size)
+    {
+        printf("short RTP send: ret=%d expected=%d\n", ret, size);
+        return -1;
+    }
+
+    return ret;
 }
 
 void rtp_sender_close(RTPSender *sender)
 {
-	if(sender->sockfd>0)
-	{
-		close(sender->sockfd);
-	}
+    if (sender == NULL)
+        return;
+
+    if (sender->sockfd >= 0)
+        close(sender->sockfd);
+
+    sender->sockfd = -1;
 }

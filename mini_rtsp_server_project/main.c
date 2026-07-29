@@ -3,18 +3,16 @@
  *                  All rights reserved.
  *
  *       Filename:  main.c
- *    Description:  This file 
- *                 
- *        Version:  1.0.0(07/19/2026)
- *         Author:  Zuo Caimei <zuocaimei@gmail.com>
- *      ChangeLog:  1, Release initial version on "07/19/2026 12:45:07 AM"
- *                 
+ *    Description:  Live camera RTSP server entry.
  ********************************************************************************/
 
 #include "rtsp_server.h"
 
-int main()
+#include <stdlib.h>
+
+int main(void)
 {
-	rtsp_server_start(8554);
-	return 0;
+    return rtsp_server_start(8554) == 0
+         ? EXIT_SUCCESS
+         : EXIT_FAILURE;
 }
