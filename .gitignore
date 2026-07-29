@@ -1,0 +1,6 @@
+
+# Local vendor libraries and reference packages
+/mpp_board_abi/
+/rkmuxer_reference/
+/rkmuxer_source_reference/
+/vendor_mpi_reference/
