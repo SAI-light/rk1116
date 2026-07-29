@@ -3,19 +3,18 @@
  *                  All rights reserved.
  *
  *       Filename:  rtsp_server.h
- *    Description:  This file 
- *
- *        Version:  1.0.0(07/19/2026)
- *         Author:  Zuo Caimei <zuocaimei@gmail.com>
- *      ChangeLog:  1, Release initial version on "07/19/2026 12:29:42 AM"
- *                 
+ *    Description:  Single-client live-camera RTSP server interface.
  ********************************************************************************/
 
 #ifndef RTSP_SERVER_H
 #define RTSP_SERVER_H
 
-
-int rtsp_server_start(int port);
-
+/*
+ * record_path:
+ *   normal .mp4 path  enable recording while PLAY is active
+ *   NULL, empty, "-"  disable MP4 recording
+ */
+int rtsp_server_start(int port,
+                      const char *record_path);
 
 #endif
