@@ -19,7 +19,7 @@
  *                     /dev/mpi/valloc, mmap it, and copy len bytes from offset.
  *                  5. Return the packet with encode_release_packet().
  *
- *        Version:  1.0.8 (2026-07-27)
+ *        Version:  1.1.0 (2026-07-29)
  ********************************************************************************/
 
 #include "mpp_encoder.h"
@@ -40,13 +40,11 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define MPP_ENCODER_BUILD_TAG "stable-vendor-packet-v8"
-#define VALLOC_DEVICE         "/dev/mpi/valloc"
-#define ENCODER_FPS           30
-#define ENCODER_GOP           30
-#define ENCODER_BPS_TARGET    4000000
-#define ENCODER_BPS_MIN       3000000
-#define ENCODER_BPS_MAX       4500000
+#define MPP_ENCODER_BUILD_TAG      "vendor-packet-v9.1-ring-boundary"
+#define VALLOC_DEVICE              "/dev/mpi/valloc"
+#define DEFAULT_ENCODER_FPS        30
+#define DEFAULT_ENCODER_GOP        30
+#define DEFAULT_ENCODER_BIT_RATE   4000000
 
 static size_t align_up_size(size_t value, size_t alignment)
 {
@@ -111,16 +109,16 @@ static int set_encoder_config(MppEncoder *encoder)
     mpp_enc_cfg_set_s32(cfg, "prep:format", MPP_FMT_YUV420SP);
 
     mpp_enc_cfg_set_s32(cfg, "rc:mode", MPP_ENC_RC_MODE_CBR);
-    mpp_enc_cfg_set_s32(cfg, "rc:bps_target", ENCODER_BPS_TARGET);
-    mpp_enc_cfg_set_s32(cfg, "rc:bps_min", ENCODER_BPS_MIN);
-    mpp_enc_cfg_set_s32(cfg, "rc:bps_max", ENCODER_BPS_MAX);
-    mpp_enc_cfg_set_s32(cfg, "rc:gop", ENCODER_GOP);
+    mpp_enc_cfg_set_s32(cfg, "rc:bps_target", encoder->bit_rate);
+    mpp_enc_cfg_set_s32(cfg, "rc:bps_min", encoder->bit_rate_min);
+    mpp_enc_cfg_set_s32(cfg, "rc:bps_max", encoder->bit_rate_max);
+    mpp_enc_cfg_set_s32(cfg, "rc:gop", encoder->gop);
 
     mpp_enc_cfg_set_s32(cfg, "rc:fps_in_flex", 0);
-    mpp_enc_cfg_set_s32(cfg, "rc:fps_in_num", ENCODER_FPS);
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_in_num", encoder->fps);
     mpp_enc_cfg_set_s32(cfg, "rc:fps_in_denorm", 1);
     mpp_enc_cfg_set_s32(cfg, "rc:fps_out_flex", 0);
-    mpp_enc_cfg_set_s32(cfg, "rc:fps_out_num", ENCODER_FPS);
+    mpp_enc_cfg_set_s32(cfg, "rc:fps_out_num", encoder->fps);
     mpp_enc_cfg_set_s32(cfg, "rc:fps_out_denorm", 1);
 
     ret = encoder->mpi->control(encoder->ctx, MPP_ENC_SET_CFG, cfg);
@@ -188,11 +186,25 @@ static int copy_vendor_packet(const struct venc_packet *packet,
         return -1;
     }
 
-    if (offset >= buffer_size || packet_len > buffer_size)
+    /*
+     * RV1106 uses offset == buf_size as a valid end-of-ring sentinel.
+     * The official mpi_enc_test treats that case as a zero-byte tail followed
+     * by packet_len bytes from the beginning of the circular buffer.
+     *
+     * Normalize the sentinel to offset 0 before mmap copying. Only an offset
+     * strictly greater than buf_size is invalid.
+     */
+    if (offset > buffer_size || packet_len > buffer_size)
     {
         printf("invalid vendor packet range: offset=%zu len=%zu buf_size=%zu\n",
                offset, packet_len, buffer_size);
         return -1;
+    }
+
+    if (offset == buffer_size)
+    {
+        printf("vendor ring boundary: normalize offset=%zu to 0\n", offset);
+        offset = 0U;
     }
 
     valloc_fd = open(VALLOC_DEVICE, O_RDWR);
@@ -275,14 +287,47 @@ CLEANUP:
 
 int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 {
+    return mpp_encoder_init_ex(encoder,
+                               width,
+                               height,
+                               DEFAULT_ENCODER_FPS,
+                               DEFAULT_ENCODER_GOP,
+                               DEFAULT_ENCODER_BIT_RATE);
+}
+
+int mpp_encoder_init_ex(MppEncoder *encoder,
+                        int width,
+                        int height,
+                        int fps,
+                        int gop,
+                        int bit_rate)
+{
     MPP_RET ret;
     MppPollType timeout = MPP_POLL_BLOCK;
     vcodec_attr attr;
     size_t frame_buffer_size;
+    int64_t bit_rate_min;
+    int64_t bit_rate_max;
 
-    if (encoder == NULL || width <= 0 || height <= 0)
+    if (encoder == NULL ||
+        width <= 0 ||
+        height <= 0 ||
+        fps <= 0 ||
+        gop <= 0 ||
+        bit_rate <= 0)
     {
-        printf("invalid encoder parameter\n");
+        printf("invalid encoder parameter: width=%d height=%d "
+               "fps=%d gop=%d bitrate=%d\n",
+               width, height, fps, gop, bit_rate);
+        return -1;
+    }
+
+    bit_rate_min = (int64_t)bit_rate * 3LL / 4LL;
+    bit_rate_max = (int64_t)bit_rate * 9LL / 8LL;
+
+    if (bit_rate_min <= 0 || bit_rate_max > INT_MAX)
+    {
+        printf("encoder bitrate range overflow: target=%d\n", bit_rate);
         return -1;
     }
 
@@ -290,6 +335,11 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
 
     encoder->width = width;
     encoder->height = height;
+    encoder->fps = fps;
+    encoder->gop = gop;
+    encoder->bit_rate = bit_rate;
+    encoder->bit_rate_min = (int)bit_rate_min;
+    encoder->bit_rate_max = (int)bit_rate_max;
     encoder->frame_size = visible_nv12_size(width, height);
     encoder->frame_index = 0;
 
@@ -298,6 +348,13 @@ int mpp_encoder_init(MppEncoder *encoder, int width, int height)
     printf("MPP encoder build: %s\n", MPP_ENCODER_BUILD_TAG);
     printf("NV12 visible_size=%zu allocated_buffer_size=%zu\n",
            encoder->frame_size, frame_buffer_size);
+    printf("encoder config: fps=%d gop=%d "
+           "bps_target=%d bps_min=%d bps_max=%d\n",
+           encoder->fps,
+           encoder->gop,
+           encoder->bit_rate,
+           encoder->bit_rate_min,
+           encoder->bit_rate_max);
 
     /*
      * The official mpi_enc_test does not create an explicit BufferGroup here.
@@ -562,4 +619,14 @@ void mpp_encoder_close(MppEncoder *encoder)
 
     /* No explicit group was created in this vendor path. */
     encoder->group = NULL;
+
+    encoder->width = 0;
+    encoder->height = 0;
+    encoder->fps = 0;
+    encoder->gop = 0;
+    encoder->bit_rate = 0;
+    encoder->bit_rate_min = 0;
+    encoder->bit_rate_max = 0;
+    encoder->frame_size = 0U;
+    encoder->frame_index = 0;
 }
