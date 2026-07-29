@@ -1,0 +1,135 @@
+# -----------------------------------------------------------------------------
+# Build outputs
+# -----------------------------------------------------------------------------
+/build/
+/bin/
+/out/
+/dist/
+/cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+*.o
+*.obj
+*.d
+*.a
+*.so
+*.so.*
+*.elf
+*.map
+
+# Root-level test executables and generated test objects
+/test_*
+!/test_*.c
+!/test_*.h
+
+# Main executable
+/mini_rtsp_server
+
+# Module-local test executables; keep test source files
+/capture/test_*
+!/capture/test_*.c
+!/capture/test_*.h
+/encoder/test_*
+!/encoder/test_*.c
+!/encoder/test_*.h
+/rtp/test_*
+!/rtp/test_*.c
+!/rtp/test_*.h
+/sdp/test_*
+!/sdp/test_*.c
+!/sdp/test_*.h
+
+# -----------------------------------------------------------------------------
+# Generated media and capture data
+# -----------------------------------------------------------------------------
+*.yuv
+*.nv12
+*.h264
+*.h265
+*.264
+*.265
+*.mp4
+*.mov
+*.mkv
+*.flv
+*.ts
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.raw
+*.pcm
+*.wav
+
+# -----------------------------------------------------------------------------
+# Logs, reports and generated checksums
+# -----------------------------------------------------------------------------
+*.log
+*.trace
+*.dump
+*.sha256
+*.md5
+*.prof
+*.gcda
+*.gcno
+*.gcov
+
+# -----------------------------------------------------------------------------
+# Archives and release packages
+# -----------------------------------------------------------------------------
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+
+# -----------------------------------------------------------------------------
+# Temporary, backup and failed-experiment files
+# -----------------------------------------------------------------------------
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.before_*
+*.failed-*
+*.failed_*
+
+# Historical numbered/source copies. Keep only encoder/mpp_encoder.c and .h.
+encoder/mpp_encoder(*).c
+encoder/mpp_encoder(*).h
+encoder/mpp_encoder_stable_*.c
+encoder/mpp_encoder_official_*.c
+encoder/mpp_encoder_task_*.c
+encoder/mpp_encoder_vendor_*.c
+encoder/mpp_encoder_complete_*.c
+encoder/mpp_encoder_v*_before_*.c
+
+# Stable snapshots should be represented by Git commits/tags, not copied trees.
+stable_camera_*/
+
+# -----------------------------------------------------------------------------
+# Crash dumps
+# -----------------------------------------------------------------------------
+core
+core.*
+*.core
+
+# -----------------------------------------------------------------------------
+# Editors and operating systems
+# -----------------------------------------------------------------------------
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+.directory
