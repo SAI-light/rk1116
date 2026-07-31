@@ -1,17 +1,19 @@
-/*********************************************************************************
- *      Copyright:  (C) 2026 Zuo Caimei<zuocaimei@gmail.com>
- *                  All rights reserved.
+/********************************************************************************
+ * Copyright: (C) 2026 Zuo Caimei <zuocaimei@gmail.com>
  *
- *       Filename:  rtsp_session.c
- *    Description:  Single-client RTSP session state.
+ * Filename: rtsp_session.c
+ * Description: Single-client RTSP session state.
  ********************************************************************************/
 
 #include "rtsp_session.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+
+#define MODULE_NAME "rtsp"
 
 void rtsp_session_init(RTSPSession *session)
 {
@@ -41,14 +43,15 @@ int rtsp_session_parse_transport(RTSPSession *session,
     if (strstr(request, "RTP/AVP/TCP") != NULL ||
         strstr(request, "interleaved=") != NULL)
     {
-        printf("RTP over TCP is not supported in this version\n");
+        LOG_WARN(MODULE_NAME,
+                 "RTP over RTSP/TCP is not supported; use RTP/UDP");
         return -1;
     }
 
     p = strstr(request, "client_port=");
     if (p == NULL)
     {
-        printf("client_port not found\n");
+        LOG_WARN(MODULE_NAME, "SETUP request has no client_port");
         return -1;
     }
 
@@ -61,17 +64,20 @@ int rtsp_session_parse_transport(RTSPSession *session,
     if (rtp_port <= 0 || rtp_port > 65535 ||
         rtcp_port <= 0 || rtcp_port > 65535)
     {
-        printf("invalid client RTP ports: %d-%d\n",
-               rtp_port,
-               rtcp_port);
+        LOG_WARN(MODULE_NAME,
+                 "invalid client RTP ports: %d-%d",
+                 rtp_port,
+                 rtcp_port);
         return -1;
     }
 
     session->client_rtp_port = rtp_port;
     session->client_rtcp_port = rtcp_port;
 
-    printf("Parsed client RTP port : %d\n", rtp_port);
-    printf("Parsed client RTCP port: %d\n", rtcp_port);
+    LOG_INFO(MODULE_NAME,
+             "client transport: RTP=%d RTCP=%d",
+             rtp_port,
+             rtcp_port);
 
     return 0;
 }

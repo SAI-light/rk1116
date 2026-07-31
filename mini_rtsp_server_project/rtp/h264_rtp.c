@@ -8,9 +8,9 @@
  ********************************************************************************/
 
 #include "h264_rtp.h"
+#include "log.h"
 #include "rtp_packet.h"
 
-#include <stdio.h>
 #include <string.h>
 
 typedef struct
@@ -188,7 +188,7 @@ int h264_rtp_packet_ex(uint8_t *nalu,
         nalu_size <= 0 || nalu_size > RTP_PAYLOAD_MAX)
     {
         if (nalu_size > RTP_PAYLOAD_MAX)
-            printf("NALU too large, need FU-A\n");
+            LOG_DEBUG("rtp", "NALU too large for a single RTP packet; FU-A required");
         return -1;
     }
 
