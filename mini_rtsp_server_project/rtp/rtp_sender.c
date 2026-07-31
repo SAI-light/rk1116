@@ -1,12 +1,12 @@
-/*********************************************************************************
- *      Copyright:  (C) 2026 Zuo Caimei<zuocaimei@gmail.com>
- *                  All rights reserved.
+/********************************************************************************
+ * Copyright: (C) 2026 Zuo Caimei <zuocaimei@gmail.com>
  *
- *       Filename:  rtp_sender.c
- *    Description:  UDP RTP sender with optional fixed local port.
+ * Filename: rtp_sender.c
+ * Description: UDP RTP sender with optional fixed local port.
  ********************************************************************************/
 
 #include "rtp_sender.h"
+#include "log.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -15,7 +15,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-int rtp_sender_init(RTPSender *sender, const char *ip, int port)
+#define MODULE_NAME "rtp"
+
+int rtp_sender_init(RTPSender *sender,
+                    const char *ip,
+                    int port)
 {
     return rtp_sender_init_ex(sender, 0, ip, port);
 }
@@ -31,6 +35,7 @@ int rtp_sender_init_ex(RTPSender *sender,
         port <= 0 || port > 65535 ||
         local_port < 0 || local_port > 65535)
     {
+        LOG_ERROR(MODULE_NAME, "invalid RTP sender parameter");
         return -1;
     }
 
@@ -40,7 +45,7 @@ int rtp_sender_init_ex(RTPSender *sender,
     sender->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sender->sockfd < 0)
     {
-        perror("RTP socket");
+        LOG_ERROR_ERRNO(MODULE_NAME, errno, "create RTP socket failed");
         return -1;
     }
 
@@ -63,9 +68,10 @@ int rtp_sender_init_ex(RTPSender *sender,
                  (struct sockaddr *)&local_addr,
                  sizeof(local_addr)) < 0)
         {
-            printf("bind RTP local port %d failed: %s\n",
-                   local_port,
-                   strerror(errno));
+            LOG_ERROR_ERRNO(MODULE_NAME,
+                            errno,
+                            "bind RTP local port %d failed",
+                            local_port);
             rtp_sender_close(sender);
             return -1;
         }
@@ -79,7 +85,7 @@ int rtp_sender_init_ex(RTPSender *sender,
                   ip,
                   &sender->remote_addr.sin_addr) != 1)
     {
-        printf("invalid RTP destination IP: %s\n", ip);
+        LOG_ERROR(MODULE_NAME, "invalid RTP destination IP: %s", ip);
         rtp_sender_close(sender);
         return -1;
     }
@@ -88,11 +94,12 @@ int rtp_sender_init_ex(RTPSender *sender,
     sender->port = port;
     sender->local_port = local_port;
 
-    printf("RTP sender init local=%d remote=%s:%d sockfd=%d\n",
-           local_port,
-           sender->ip,
-           sender->port,
-           sender->sockfd);
+    LOG_INFO(MODULE_NAME,
+             "sender initialized: local=%d remote=%s:%d socket=%d",
+             local_port,
+             sender->ip,
+             sender->port,
+             sender->sockfd);
 
     return 0;
 }
@@ -118,13 +125,16 @@ int rtp_sender_send(RTPSender *sender,
 
     if (ret < 0)
     {
-        perror("RTP sendto");
+        LOG_ERROR_ERRNO(MODULE_NAME, errno, "send RTP packet failed");
         return -1;
     }
 
     if (ret != size)
     {
-        printf("short RTP send: ret=%d expected=%d\n", ret, size);
+        LOG_ERROR(MODULE_NAME,
+                  "short RTP send: sent=%d expected=%d",
+                  ret,
+                  size);
         return -1;
     }
 

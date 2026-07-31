@@ -19,15 +19,11 @@ compile_commands.json
 *.elf
 *.map
 
-# Root-level test executables and generated test objects
+# Root-level and module-local generated executables; keep test source files.
+/mini_rtsp_server*
 /test_*
 !/test_*.c
 !/test_*.h
-
-# Main executable
-/mini_rtsp_server
-
-# Module-local test executables; keep test source files
 /capture/test_*
 !/capture/test_*.c
 !/capture/test_*.h
@@ -64,7 +60,7 @@ compile_commands.json
 *.wav
 
 # -----------------------------------------------------------------------------
-# Logs, reports and generated checksums
+# Logs, profiling data and generated checksums
 # -----------------------------------------------------------------------------
 *.log
 *.trace
@@ -77,7 +73,7 @@ compile_commands.json
 *.gcov
 
 # -----------------------------------------------------------------------------
-# Archives and release packages
+# Archives and generated integration packages
 # -----------------------------------------------------------------------------
 *.tar
 *.tar.gz
@@ -85,9 +81,10 @@ compile_commands.json
 *.zip
 *.7z
 *.rar
+*.patch
 
 # -----------------------------------------------------------------------------
-# Temporary, backup and failed-experiment files
+# Temporary, backup and failed-experiment source files
 # -----------------------------------------------------------------------------
 *.bak
 *.backup
@@ -100,10 +97,12 @@ compile_commands.json
 *.swo
 *~
 *.before_*
+*_before_*.c
+*_before_*.h
 *.failed-*
 *.failed_*
 
-# Historical numbered/source copies. Keep only encoder/mpp_encoder.c and .h.
+# Historical encoder variants. Keep only encoder/mpp_encoder.c and .h.
 encoder/mpp_encoder(*).c
 encoder/mpp_encoder(*).h
 encoder/mpp_encoder_stable_*.c
@@ -113,19 +112,22 @@ encoder/mpp_encoder_vendor_*.c
 encoder/mpp_encoder_complete_*.c
 encoder/mpp_encoder_v*_before_*.c
 
-# Stable snapshots should be represented by Git commits/tags, not copied trees.
+# Stable snapshots belong in Git tags, not duplicated worktree directories.
 stable_camera_*/
+stable-live-*/
+
+# One-off integration helper files superseded by docs/VALIDATION.md.
+/README.txt
+/COMPLETE_OVERLAY_README.txt
+/INTEGRATION_NOTES.md
+/INTEGRATION_NOTES_V2.md
 
 # -----------------------------------------------------------------------------
-# Crash dumps
+# Local environment and IDE files
 # -----------------------------------------------------------------------------
-core
-core.*
-*.core
-
-# -----------------------------------------------------------------------------
-# Editors and operating systems
-# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
 .vscode/
 .idea/
 *.code-workspace
@@ -134,6 +136,11 @@ Thumbs.db
 Desktop.ini
 .directory
 
-# Local RTSP source snapshots
-/rtsp/rtsp_media_v*_before_*.c
-/rtsp/rtsp_media_v*_before_*.h
+# -----------------------------------------------------------------------------
+# Crash dumps
+# -----------------------------------------------------------------------------
+core
+core.*
+*.core
+/encoder/*_working.*
+/encoder/*_failed*

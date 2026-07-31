@@ -23,6 +23,7 @@
  ********************************************************************************/
 
 #include "mpp_encoder.h"
+#include "log.h"
 
 #include "rockchip/rk_mpi_mb_cmd.h"
 #include "rockchip/rk_venc_cfg.h"
@@ -41,21 +42,14 @@
 #include <unistd.h>
 
 #define MPP_ENCODER_BUILD_TAG      "vendor-packet-v9.2-quiet-runtime"
+#define MODULE_NAME                "encoder"
 #define VALLOC_DEVICE              "/dev/mpi/valloc"
 #define DEFAULT_ENCODER_FPS        30
 #define DEFAULT_ENCODER_GOP        30
 #define DEFAULT_ENCODER_BIT_RATE   4000000
 
-#ifndef MPP_ENCODER_FRAME_DEBUG
-#define MPP_ENCODER_FRAME_DEBUG    0
-#endif
-
-#define MPP_FRAME_LOG(...)                                              \
-    do                                                                  \
-    {                                                                   \
-        if (MPP_ENCODER_FRAME_DEBUG)                                    \
-            printf(__VA_ARGS__);                                        \
-    } while (0)
+#define MPP_FRAME_LOG(...) \
+    LOG_DEBUG(MODULE_NAME, __VA_ARGS__)
 
 static size_t align_up_size(size_t value, size_t alignment)
 {
@@ -82,13 +76,26 @@ static size_t allocated_nv12_size(int width, int height)
 
 static void print_first_bytes(const uint8_t *data, size_t length)
 {
+    char text[16U * 3U + 1U];
     size_t i;
+    size_t offset = 0U;
     size_t show = length < 16U ? length : 16U;
 
-    printf("H264 first bytes:");
-    for (i = 0; i < show; ++i)
-        printf(" %02x", data[i]);
-    printf("\n");
+    memset(text, 0, sizeof(text));
+
+    for (i = 0U; i < show && offset < sizeof(text); ++i)
+    {
+        int written = snprintf(text + offset,
+                               sizeof(text) - offset,
+                               "%s%02x",
+                               i == 0U ? "" : " ",
+                               data[i]);
+        if (written < 0 || (size_t)written >= sizeof(text) - offset)
+            break;
+        offset += (size_t)written;
+    }
+
+    LOG_DEBUG(MODULE_NAME, "H264 first bytes: %s", text);
 }
 
 static int set_encoder_config(MppEncoder *encoder)
@@ -99,14 +106,14 @@ static int set_encoder_config(MppEncoder *encoder)
     ret = mpp_enc_cfg_init(&cfg);
     if (ret != MPP_OK || cfg == NULL)
     {
-        printf("mpp_enc_cfg_init failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "mpp_enc_cfg_init failed ret=%d", ret);
         return -1;
     }
 
     ret = encoder->mpi->control(encoder->ctx, MPP_ENC_GET_CFG, cfg);
     if (ret != MPP_OK)
     {
-        printf("MPP_ENC_GET_CFG failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "MPP_ENC_GET_CFG failed ret=%d", ret);
         mpp_enc_cfg_deinit(cfg);
         return -1;
     }
@@ -137,7 +144,7 @@ static int set_encoder_config(MppEncoder *encoder)
 
     if (ret != MPP_OK)
     {
-        printf("MPP_ENC_SET_CFG failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "MPP_ENC_SET_CFG failed ret=%d", ret);
         return -1;
     }
 
@@ -182,7 +189,7 @@ static int copy_vendor_packet(const struct venc_packet *packet,
                   " offset=%" PRIu32
                   " data_num=%" PRIu32
                   " flag=0x%08" PRIx32
-                  " pts=%" PRIu64 "\n",
+                  " pts=%" PRIu64 "",
                   (RK_U32)packet->u64priv_data,
                   packet->len,
                   packet->buf_size,
@@ -193,7 +200,7 @@ static int copy_vendor_packet(const struct venc_packet *packet,
 
     if (packet_len == 0U || buffer_size == 0U)
     {
-        printf("vendor packet is empty\n");
+        LOG_ERROR(MODULE_NAME, "vendor packet is empty");
         return -1;
     }
 
@@ -207,21 +214,21 @@ static int copy_vendor_packet(const struct venc_packet *packet,
      */
     if (offset > buffer_size || packet_len > buffer_size)
     {
-        printf("invalid vendor packet range: offset=%zu len=%zu buf_size=%zu\n",
+        LOG_ERROR(MODULE_NAME, "invalid vendor packet range: offset=%zu len=%zu buf_size=%zu",
                offset, packet_len, buffer_size);
         return -1;
     }
 
     if (offset == buffer_size)
     {
-        printf("vendor ring boundary: normalize offset=%zu to 0\n", offset);
+        LOG_WARN(MODULE_NAME, "vendor ring boundary: normalize offset=%zu to 0", offset);
         offset = 0U;
     }
 
     valloc_fd = open(VALLOC_DEVICE, O_RDWR);
     if (valloc_fd < 0)
     {
-        printf("open %s failed: %s\n",
+        LOG_ERROR(MODULE_NAME, "open %s failed: %s",
                VALLOC_DEVICE, strerror(errno));
         return -1;
     }
@@ -232,7 +239,7 @@ static int copy_vendor_packet(const struct venc_packet *packet,
 
     if (ioctl(valloc_fd, VALLOC_IOCTL_MB_GET_FD, &mb) < 0)
     {
-        printf("VALLOC_IOCTL_MB_GET_FD failed: mpi_buf_id=%d error=%s\n",
+        LOG_ERROR(MODULE_NAME, "VALLOC_IOCTL_MB_GET_FD failed: mpi_buf_id=%d error=%s",
                mb.mpi_buf_id, strerror(errno));
         goto CLEANUP;
     }
@@ -240,12 +247,12 @@ static int copy_vendor_packet(const struct venc_packet *packet,
     dma_fd = mb.dma_buf_fd;
     if (dma_fd < 0)
     {
-        printf("VALLOC_IOCTL_MB_GET_FD returned invalid dma fd=%d\n", dma_fd);
+        LOG_ERROR(MODULE_NAME, "VALLOC_IOCTL_MB_GET_FD returned invalid dma fd=%d", dma_fd);
         goto CLEANUP;
     }
 
     MPP_FRAME_LOG("valloc packet buffer: mpi_buf_id=%d "
-                  "dma_buf_fd=%d size=%d\n",
+                  "dma_buf_fd=%d size=%d",
                   mb.mpi_buf_id, dma_fd, mb.size);
 
     mapped = (uint8_t *)mmap(NULL,
@@ -256,14 +263,14 @@ static int copy_vendor_packet(const struct venc_packet *packet,
                              0);
     if (mapped == MAP_FAILED)
     {
-        printf("mmap encoded stream failed: %s\n", strerror(errno));
+        LOG_ERROR(MODULE_NAME, "mmap encoded stream failed: %s", strerror(errno));
         goto CLEANUP;
     }
 
     result = (uint8_t *)malloc(packet_len);
     if (result == NULL)
     {
-        printf("malloc H264 output failed, size=%zu\n", packet_len);
+        LOG_ERROR(MODULE_NAME, "malloc H264 output failed, size=%zu", packet_len);
         goto CLEANUP;
     }
 
@@ -276,7 +283,7 @@ static int copy_vendor_packet(const struct venc_packet *packet,
     if (packet_len > first_part)
         memcpy(result + first_part, mapped, packet_len - first_part);
 
-    if (MPP_ENCODER_FRAME_DEBUG)
+    if (log_get_level() >= LOG_LEVEL_DEBUG)
         print_first_bytes(result, packet_len);
 
     *out = result;
@@ -329,8 +336,8 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
         gop <= 0 ||
         bit_rate <= 0)
     {
-        printf("invalid encoder parameter: width=%d height=%d "
-               "fps=%d gop=%d bitrate=%d\n",
+        LOG_ERROR(MODULE_NAME, "invalid encoder parameter: width=%d height=%d "
+               "fps=%d gop=%d bitrate=%d",
                width, height, fps, gop, bit_rate);
         return -1;
     }
@@ -340,7 +347,7 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
 
     if (bit_rate_min <= 0 || bit_rate_max > INT_MAX)
     {
-        printf("encoder bitrate range overflow: target=%d\n", bit_rate);
+        LOG_ERROR(MODULE_NAME, "encoder bitrate range overflow: target=%d", bit_rate);
         return -1;
     }
 
@@ -358,11 +365,13 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
 
     frame_buffer_size = allocated_nv12_size(width, height);
 
-    printf("MPP encoder build: %s\n", MPP_ENCODER_BUILD_TAG);
-    printf("NV12 visible_size=%zu allocated_buffer_size=%zu\n",
-           encoder->frame_size, frame_buffer_size);
-    printf("encoder config: fps=%d gop=%d "
-           "bps_target=%d bps_min=%d bps_max=%d\n",
+    LOG_INFO(MODULE_NAME, "build: %s", MPP_ENCODER_BUILD_TAG);
+    LOG_INFO(MODULE_NAME,
+             "NV12 buffers: visible=%zu allocated=%zu",
+             encoder->frame_size,
+             frame_buffer_size);
+    LOG_INFO(MODULE_NAME, "config: fps=%d gop=%d "
+           "bps_target=%d bps_min=%d bps_max=%d",
            encoder->fps,
            encoder->gop,
            encoder->bit_rate,
@@ -377,14 +386,14 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
     encoder->group = NULL;
 
     ret = mpp_buffer_get(NULL, &encoder->frm_buf, frame_buffer_size);
-    printf("pre-create frm_buf ret=%d buf=%p ptr=%p\n",
+    LOG_DEBUG(MODULE_NAME, "pre-create frm_buf ret=%d buf=%p ptr=%p",
            ret,
            encoder->frm_buf,
            encoder->frm_buf ? mpp_buffer_get_ptr(encoder->frm_buf) : NULL);
 
     if (ret != MPP_OK || encoder->frm_buf == NULL)
     {
-        printf("mpp_buffer_get frm_buf failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "mpp_buffer_get frm_buf failed ret=%d", ret);
         goto FAIL;
     }
 
@@ -394,30 +403,30 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
      * public output MppPacket; encoded output comes from struct venc_packet.
      */
     ret = mpp_buffer_get(NULL, &encoder->pkt_buf, frame_buffer_size);
-    printf("pre-create auxiliary buf ret=%d buf=%p ptr=%p\n",
+    LOG_DEBUG(MODULE_NAME, "pre-create auxiliary buf ret=%d buf=%p ptr=%p",
            ret,
            encoder->pkt_buf,
            encoder->pkt_buf ? mpp_buffer_get_ptr(encoder->pkt_buf) : NULL);
 
     if (ret != MPP_OK || encoder->pkt_buf == NULL)
     {
-        printf("mpp_buffer_get auxiliary buffer failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "mpp_buffer_get auxiliary buffer failed ret=%d", ret);
         goto FAIL;
     }
 
-    printf("before mpp_create\n");
+    LOG_DEBUG(MODULE_NAME, "before mpp_create");
 
     ret = mpp_create(&encoder->ctx, &encoder->mpi);
-    printf("after mpp_create: ret=%d ctx=%p mpi=%p\n",
+    LOG_DEBUG(MODULE_NAME, "after mpp_create: ret=%d ctx=%p mpi=%p",
            ret, encoder->ctx, encoder->mpi);
 
     if (ret != MPP_OK || encoder->ctx == NULL || encoder->mpi == NULL)
     {
-        printf("mpp_create failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "mpp_create failed ret=%d", ret);
         goto FAIL;
     }
 
-    printf("MppApi sizeof=%zu api_size=%u version=%u release_packet=%p\n",
+    LOG_DEBUG(MODULE_NAME, "MppApi sizeof=%zu api_size=%u version=%u release_packet=%p",
            sizeof(MppApi),
            encoder->mpi->size,
            encoder->mpi->version,
@@ -429,11 +438,11 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
     attr.chan_id = 0;
 
     ret = mpp_init_ext(encoder->ctx, &attr);
-    printf("after mpp_init_ext: ret=%d\n", ret);
+    LOG_DEBUG(MODULE_NAME, "after mpp_init_ext: ret=%d", ret);
 
     if (ret != MPP_OK)
     {
-        printf("mpp_init_ext failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "mpp_init_ext failed ret=%d", ret);
         goto FAIL;
     }
 
@@ -442,11 +451,11 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
     ret = encoder->mpi->control(encoder->ctx,
                                 MPP_SET_OUTPUT_TIMEOUT,
                                 &timeout);
-    printf("MPP_SET_OUTPUT_TIMEOUT ret=%d\n", ret);
+    LOG_DEBUG(MODULE_NAME, "MPP_SET_OUTPUT_TIMEOUT ret=%d", ret);
 
     if (ret != MPP_OK)
     {
-        printf("MPP_SET_OUTPUT_TIMEOUT failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "MPP_SET_OUTPUT_TIMEOUT failed ret=%d", ret);
         goto FAIL;
     }
 
@@ -462,7 +471,7 @@ int mpp_encoder_init_ex(MppEncoder *encoder,
     encoder->header_len = 0;
     encoder->header_pending = 0;
 
-    printf("MPP encoder init success\n");
+    LOG_INFO(MODULE_NAME, "MPP encoder initialized");
     return 0;
 
 FAIL:
@@ -491,7 +500,7 @@ int mpp_encoder_encode(MppEncoder *encoder,
         nv12 == NULL ||
         out == NULL)
     {
-        printf("mpp_encoder_encode invalid parameter\n");
+        LOG_ERROR(MODULE_NAME, "mpp_encoder_encode invalid parameter");
         return -1;
     }
 
@@ -499,7 +508,7 @@ int mpp_encoder_encode(MppEncoder *encoder,
 
     if (size < 0 || (size_t)size < encoder->frame_size)
     {
-        printf("NV12 size too small: input=%d expected=%zu\n",
+        LOG_ERROR(MODULE_NAME, "NV12 size too small: input=%d expected=%zu",
                size, encoder->frame_size);
         return -1;
     }
@@ -510,7 +519,7 @@ int mpp_encoder_encode(MppEncoder *encoder,
     frame_ptr = mpp_buffer_get_ptr(encoder->frm_buf);
     if (frame_ptr == NULL)
     {
-        printf("mpp_buffer_get_ptr(frm_buf) failed\n");
+        LOG_ERROR(MODULE_NAME, "mpp_buffer_get_ptr(frm_buf) failed");
         return -1;
     }
 
@@ -520,7 +529,7 @@ int mpp_encoder_encode(MppEncoder *encoder,
     ret = mpp_frame_init(&frame);
     if (ret != MPP_OK || frame == NULL)
     {
-        printf("mpp_frame_init failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "mpp_frame_init failed ret=%d", ret);
         goto CLEANUP;
     }
 
@@ -534,11 +543,11 @@ int mpp_encoder_encode(MppEncoder *encoder,
     mpp_frame_set_buffer(frame, encoder->frm_buf);
 
     MPP_FRAME_LOG("start encode NV12 with RV1106 vendor packet ABI, "
-                  "frame=%" PRId64 "\n",
+                  "frame=%" PRId64 "",
                   encoder->frame_index - 1);
 
     ret = encoder->mpi->encode_put_frame(encoder->ctx, frame);
-    MPP_FRAME_LOG("encode_put_frame ret=%d\n", ret);
+    MPP_FRAME_LOG("encode_put_frame ret=%d", ret);
 
     /* Official mpi_enc_test releases the input frame immediately after put. */
     mpp_frame_deinit(&frame);
@@ -546,7 +555,7 @@ int mpp_encoder_encode(MppEncoder *encoder,
 
     if (ret != MPP_OK)
     {
-        printf("encode_put_frame failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "encode_put_frame failed ret=%d", ret);
         goto CLEANUP;
     }
 
@@ -554,12 +563,12 @@ int mpp_encoder_encode(MppEncoder *encoder,
     packet_handle = (MppPacket)&vendor_packet;
 
     ret = encoder->mpi->encode_get_packet(encoder->ctx, &packet_handle);
-    MPP_FRAME_LOG("encode_get_packet ret=%d handle=%p expected=%p\n",
+    MPP_FRAME_LOG("encode_get_packet ret=%d handle=%p expected=%p",
                   ret, packet_handle, (void *)&vendor_packet);
 
     if (ret != MPP_OK)
     {
-        printf("encode_get_packet failed ret=%d\n", ret);
+        LOG_ERROR(MODULE_NAME, "encode_get_packet failed ret=%d", ret);
         goto CLEANUP;
     }
 
@@ -567,7 +576,7 @@ int mpp_encoder_encode(MppEncoder *encoder,
 
     if (packet_handle != (MppPacket)&vendor_packet)
     {
-        printf("unexpected vendor packet handle replacement: %p\n",
+        LOG_ERROR(MODULE_NAME, "unexpected vendor packet handle replacement: %p",
                packet_handle);
         goto RELEASE_PACKET;
     }
@@ -579,14 +588,14 @@ RELEASE_PACKET:
     {
         if (encoder->mpi->encode_release_packet == NULL)
         {
-            printf("encode_release_packet API is NULL\n");
+            LOG_ERROR(MODULE_NAME, "encode_release_packet API is NULL");
             result = -1;
         }
         else
         {
             ret = encoder->mpi->encode_release_packet(encoder->ctx,
                                                        &packet_handle);
-            MPP_FRAME_LOG("encode_release_packet ret=%d\n", ret);
+            MPP_FRAME_LOG("encode_release_packet ret=%d", ret);
             if (ret != MPP_OK)
             {
                 free(*out);
