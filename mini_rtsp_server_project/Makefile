@@ -10,10 +10,17 @@ CC := $(CROSS_COMPILE)gcc
 endif
 STRIP ?= $(CROSS_COMPILE)strip
 
-MPP_RELEASE ?= $(HOME)/boards/rk1116/sdk/luckfox-pico/media/mpp/release_mpp_rv1106_arm-rockchip830-linux-uclibcgnueabihf
+SDK_ROOT ?= $(HOME)/boards/rk1116/sdk/luckfox-pico
+
+MPP_RELEASE ?= $(SDK_ROOT)/media/mpp/release_mpp_rv1106_arm-rockchip830-linux-uclibcgnueabihf
 BOARD_MPP_LIB ?= $(HOME)/boards/rk1116/mpp_board_abi
-RKMUXER_INCLUDE ?= $(HOME)/boards/rk1116/sdk/luckfox-pico/media/out/include
+
+MEDIA_OUT_INCLUDE ?= $(SDK_ROOT)/media/out/include
+RKMUXER_INCLUDE ?= $(MEDIA_OUT_INCLUDE)
 RKMUXER_LIB ?= $(HOME)/boards/rk1116/rkmuxer_reference/lib
+
+RKAIQ_INCLUDE_ROOT ?= $(MEDIA_OUT_INCLUDE)/rkaiq
+RKAIQ_LIB ?= $(SDK_ROOT)/media/out/lib
 
 BUILD_DIR := build/$(BUILD)
 TARGET := $(BUILD_DIR)/bin/$(PROJECT)
@@ -24,6 +31,7 @@ SOURCES := \
 	capture/v4l2_capture.c \
 	encoder/mpp_encoder.c \
 	h264/h264_annexb.c \
+	isp/isp_control.c \
 	muxer/mp4_muxer.c \
 	rtp/rtp_packet.c \
 	rtp/rtp_sender.c \
@@ -43,12 +51,20 @@ CPPFLAGS += \
 	-Icapture \
 	-Iencoder \
 	-Ih264 \
+	-Iisp \
 	-Imuxer \
 	-Irtp \
 	-Irtsp \
 	-Isdp \
 	-I$(MPP_RELEASE)/include \
 	-I$(RKMUXER_INCLUDE) \
+	-I$(RKAIQ_INCLUDE_ROOT) \
+	-I$(RKAIQ_INCLUDE_ROOT)/uAPI2 \
+	-I$(RKAIQ_INCLUDE_ROOT)/common \
+	-I$(RKAIQ_INCLUDE_ROOT)/xcore \
+	-I$(RKAIQ_INCLUDE_ROOT)/algos \
+	-I$(RKAIQ_INCLUDE_ROOT)/iq_parser \
+	-I$(RKAIQ_INCLUDE_ROOT)/iq_parser_v2 \
 	-DPROJECT_VERSION=\"$(VERSION)\"
 
 COMMON_CFLAGS := \
@@ -73,9 +89,18 @@ LDFLAGS += \
 	-Wl,-rpath-link,$(BOARD_MPP_LIB) \
 	-L$(RKMUXER_LIB) \
 	-Wl,-rpath-link,$(RKMUXER_LIB) \
+	-L$(RKAIQ_LIB) \
+	-Wl,-rpath-link,$(RKAIQ_LIB) \
 	-Wl,-rpath,/oem/usr/lib
 
-LDLIBS += -lrockchip_mpp -lrkmuxer -lpthread -lm -ldl
+LDLIBS += \
+	-lrockchip_mpp \
+	-lrkmuxer \
+	-lrkaiq \
+	-lpthread \
+	-lm \
+	-ldl \
+	-lstdc++
 
 PREFIX ?= /usr/local
 DESTDIR ?=
@@ -93,6 +118,10 @@ check-config:
 		{ echo "Missing rkmuxer.h under RKMUXER_INCLUDE=$(RKMUXER_INCLUDE)"; exit 1; }
 	@test -f "$(RKMUXER_LIB)/librkmuxer.so" || \
 		{ echo "Missing librkmuxer.so under RKMUXER_LIB=$(RKMUXER_LIB)"; exit 1; }
+	@test -f "$(RKAIQ_INCLUDE_ROOT)/uAPI2/rk_aiq_user_api2_sysctl.h" || \
+		{ echo "Missing RKAIQ headers under RKAIQ_INCLUDE_ROOT=$(RKAIQ_INCLUDE_ROOT)"; exit 1; }
+	@test -f "$(RKAIQ_LIB)/librkaiq.so" || \
+		{ echo "Missing librkaiq.so under RKAIQ_LIB=$(RKAIQ_LIB)"; exit 1; }
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(dir $@)
@@ -104,15 +133,18 @@ $(BUILD_DIR)/obj/%.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 print-config:
-	@echo "PROJECT         = $(PROJECT)"
-	@echo "VERSION         = $(VERSION)"
-	@echo "BUILD           = $(BUILD)"
-	@echo "CC              = $(CC)"
-	@echo "TARGET          = $(TARGET)"
-	@echo "MPP_RELEASE     = $(MPP_RELEASE)"
-	@echo "BOARD_MPP_LIB   = $(BOARD_MPP_LIB)"
-	@echo "RKMUXER_INCLUDE = $(RKMUXER_INCLUDE)"
-	@echo "RKMUXER_LIB     = $(RKMUXER_LIB)"
+	@echo "PROJECT             = $(PROJECT)"
+	@echo "VERSION             = $(VERSION)"
+	@echo "BUILD               = $(BUILD)"
+	@echo "CC                  = $(CC)"
+	@echo "TARGET              = $(TARGET)"
+	@echo "SDK_ROOT            = $(SDK_ROOT)"
+	@echo "MPP_RELEASE         = $(MPP_RELEASE)"
+	@echo "BOARD_MPP_LIB       = $(BOARD_MPP_LIB)"
+	@echo "RKMUXER_INCLUDE     = $(RKMUXER_INCLUDE)"
+	@echo "RKMUXER_LIB         = $(RKMUXER_LIB)"
+	@echo "RKAIQ_INCLUDE_ROOT  = $(RKAIQ_INCLUDE_ROOT)"
+	@echo "RKAIQ_LIB           = $(RKAIQ_LIB)"
 
 strip: all
 	$(STRIP) $(TARGET)
