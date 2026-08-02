@@ -28,7 +28,6 @@
 #define RTSP_MEDIA_BUILD_TAG   "live-rtsp-mp4-v2.4-rc1-engineering-cleanup"
 #define MODULE_NAME            "media"
 #define CAPTURE_TIMEOUT_MS     3000
-#define WARMUP_FRAME_COUNT     5
 #define LIVE_MUXER_ID          0
 #define H264_NAL_IDR           5U
 #define H264_NAL_SPS           7U
@@ -520,18 +519,20 @@ static int write_mp4_access_unit(RTSPMedia *media,
 int rtsp_media_init(RTSPMedia *media,
                     const char *device_path,
                     const char *record_path,
+                    int warmup_frame_count,
                     const volatile sig_atomic_t *external_stop_flag)
 {
     V4L2Frame frame;
     int i;
 
-    if (media == NULL)
+    if (media == NULL || warmup_frame_count < 0)
         return -1;
 
     memset(media, 0, sizeof(*media));
     media->capture.fd = -1;
     media->sender.sockfd = -1;
     media->external_stop_flag = external_stop_flag;
+    media->warmup_frame_count = warmup_frame_count;
 
     if (device_path == NULL || device_path[0] == '\0')
     {
@@ -594,7 +595,7 @@ int rtsp_media_init(RTSPMedia *media,
     }
 
     memset(&frame, 0, sizeof(frame));
-    for (i = 0; i < WARMUP_FRAME_COUNT; ++i)
+    for (i = 0; i < media->warmup_frame_count; ++i)
     {
         if (v4l2_capture_acquire_frame(&media->capture,
                                        &frame,
@@ -607,7 +608,7 @@ int rtsp_media_init(RTSPMedia *media,
         LOG_DEBUG(MODULE_NAME,
                   "warmup frame %d/%d sequence=%u size=%zu",
                   i + 1,
-                  WARMUP_FRAME_COUNT,
+                  media->warmup_frame_count,
                   frame.sequence,
                   frame.size);
 
@@ -617,6 +618,10 @@ int rtsp_media_init(RTSPMedia *media,
             goto FAIL;
         }
     }
+
+    LOG_INFO(MODULE_NAME,
+             "camera warmup completed: discarded=%d frames",
+             media->warmup_frame_count);
 
     if (mpp_encoder_init_ex(&media->encoder,
                             RTSP_MEDIA_WIDTH,
@@ -901,7 +906,7 @@ static void *media_thread(void *arg)
         if (muxer_initialized)
             ++recording_frame_count;
 
-        if (is_idr || frame_count == 1U || frame_count % 25U == 0U)
+        if (is_idr || frame_count == 1U || frame_count % (unsigned int)RTSP_MEDIA_FPS == 0U)
         {
             LOG_DEBUG(MODULE_NAME,
                       "frame=%u capture_sequence=%u idr=%d timestamp=%u packets=%d next_seq=%u recorded=%llu",

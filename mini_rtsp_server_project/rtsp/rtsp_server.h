@@ -18,6 +18,9 @@ typedef struct
     /* NULL disables recording. A normal path must end in .mp4. */
     const char *record_path;
 
+    /* Number of V4L2 frames discarded before MPP bootstrap. */
+    int warmup_frame_count;
+
     /* Optional process-wide graceful-shutdown integration. */
     const volatile sig_atomic_t *stop_flag;
     int stop_fd;

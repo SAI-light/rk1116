@@ -20,8 +20,8 @@
 
 #define RTSP_MEDIA_WIDTH             2304
 #define RTSP_MEDIA_HEIGHT            1296
-#define RTSP_MEDIA_FPS               25
-#define RTSP_MEDIA_GOP               25
+#define RTSP_MEDIA_FPS               30
+#define RTSP_MEDIA_GOP               30
 #define RTSP_MEDIA_BIT_RATE          4000000
 #define RTSP_MEDIA_RTP_CLOCK         90000
 #define RTSP_MEDIA_DEVICE_PATH_MAX   128
@@ -46,6 +46,7 @@ typedef struct
     char device_path[RTSP_MEDIA_DEVICE_PATH_MAX];
     char record_path[RTSP_MEDIA_RECORD_PATH_MAX];
     int recording_enabled;
+    int warmup_frame_count;
 
     const volatile sig_atomic_t *external_stop_flag;
 
@@ -63,6 +64,7 @@ typedef struct
 int rtsp_media_init(RTSPMedia *media,
                     const char *device_path,
                     const char *record_path,
+                    int warmup_frame_count,
                     const volatile sig_atomic_t *external_stop_flag);
 int rtsp_media_start(RTSPMedia *media,
                      RTSPSession *session);

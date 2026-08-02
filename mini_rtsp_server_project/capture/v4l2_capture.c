@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 #define MODULE_NAME "capture"
-#define TARGET_CAPTURE_FPS 25U
+#define TARGET_CAPTURE_FPS 30U
 
 static int xioctl(int fd,
                   unsigned long request,

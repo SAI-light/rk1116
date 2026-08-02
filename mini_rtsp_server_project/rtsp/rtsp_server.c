@@ -388,7 +388,8 @@ int rtsp_server_run(const RTSPServerConfig *config)
 
     if (config == NULL ||
         config->port <= 0 || config->port > 65535 ||
-        config->device_path == NULL || config->device_path[0] == '\0')
+        config->device_path == NULL || config->device_path[0] == '\0' ||
+        config->warmup_frame_count < 0)
     {
         LOG_ERROR(MODULE_NAME, "invalid RTSP server configuration");
         return -1;
@@ -434,6 +435,7 @@ int rtsp_server_run(const RTSPServerConfig *config)
     if (rtsp_media_init(&media,
                         config->device_path,
                         config->record_path,
+                        config->warmup_frame_count,
                         config->stop_flag) < 0)
     {
         goto CLEANUP;
