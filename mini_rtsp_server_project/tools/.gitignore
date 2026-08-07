@@ -1,0 +1,9 @@
+# Build outputsignore
+
+# Build outputs
+*/build/
+
+# Local source backups
+*.bak
+*.bak_*
+*.bak.*
