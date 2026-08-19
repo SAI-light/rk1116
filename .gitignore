@@ -4,3 +4,29 @@
 /rkmuxer_reference/
 /rkmuxer_source_reference/
 /vendor_mpi_reference/
+
+# Build artifacts
+*.o
+*.d
+**/build/
+
+# Generated executables in repository root
+/extract_sps_pps
+/h264_parser
+/mini_rtsp_server
+
+# Generated media files
+*.h264
+*.264
+*.yuv
+*.mp4
+*.bmp
+
+# Logs
+*.log
+
+# Local backup files
+*.bak
+*.bak_*
+*.bak.*
+*~
