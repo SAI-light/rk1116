@@ -1,0 +1,10 @@
+# Build outputsignore
+
+# Build outputs
+*/build/
+
+# Local source backups
+*.bak
+*.bak_*
+*.bak.*
+person_event_test/person_event_test
