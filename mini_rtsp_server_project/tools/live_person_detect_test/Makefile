@@ -28,6 +28,7 @@ RKAIQ_LIB := $(RKAIQ_ROOT)/lib
 OBJECTS := \
 	$(BUILD_DIR)/main.o \
 	$(BUILD_DIR)/live_person_detector.o \
+	$(BUILD_DIR)/person_event.o \
 	$(BUILD_DIR)/v4l2_capture.o \
 	$(BUILD_DIR)/isp_control.o \
 	$(BUILD_DIR)/log.o
@@ -37,6 +38,7 @@ DEPS := $(OBJECTS:.o=.d)
 CPPFLAGS += \
 	-I. \
 	-I$(PROJECT_ROOT)/capture \
+	-I$(PROJECT_ROOT)/event \
 	-I$(PROJECT_ROOT)/isp \
 	-I$(PROJECT_ROOT)/include \
 	-I$(ROCKIVA_INCLUDE) \
@@ -82,6 +84,10 @@ all: check-config $(TARGET)
 check-config:
 	@test -f "$(PROJECT_ROOT)/capture/v4l2_capture.c" || \
 		{ echo "Missing $(PROJECT_ROOT)/capture/v4l2_capture.c"; exit 1; }
+	@test -f "$(PROJECT_ROOT)/event/person_event.c" || \
+		{ echo "Missing $(PROJECT_ROOT)/event/person_event.c"; exit 1; }
+	@test -f "$(PROJECT_ROOT)/event/person_event.h" || \
+		{ echo "Missing $(PROJECT_ROOT)/event/person_event.h"; exit 1; }
 	@test -f "$(PROJECT_ROOT)/isp/isp_control.c" || \
 		{ echo "Missing $(PROJECT_ROOT)/isp/isp_control.c"; exit 1; }
 	@test -f "$(PROJECT_ROOT)/common/log.c" || \
@@ -107,7 +113,14 @@ $(BUILD_DIR)/main.o: main.c live_person_detector.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/live_person_detector.o: \
-	live_person_detector.c live_person_detector.h
+	live_person_detector.c live_person_detector.h \
+	$(PROJECT_ROOT)/event/person_event.h
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/person_event.o: \
+	$(PROJECT_ROOT)/event/person_event.c \
+	$(PROJECT_ROOT)/event/person_event.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 

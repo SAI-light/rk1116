@@ -6,6 +6,7 @@
  ********************************************************************************/
 
 #include "live_person_detector.h"
+#include "person_event.h"
 
 #include "rockiva_common.h"
 #include "rockiva_det_api.h"
@@ -56,6 +57,9 @@ struct LivePersonDetector
     int global_initialized;
     int detect_initialized;
     int shutting_down;
+
+    PersonEventTracker event_tracker;
+    int event_tracker_initialized;
 
     LivePersonDetectorStats stats;
 };
@@ -178,7 +182,10 @@ static void detect_result_callback(
     int64_t callback_ms;
     int64_t latency_ms = -1;
     uint32_t person_count = 0U;
+    uint8_t max_score = 0U;
     uint32_t i;
+    PersonEventInput event_input;
+    PersonEventResult event_result;
 
     if (detector == NULL)
         return;
@@ -213,6 +220,9 @@ static void detect_result_callback(
             ROCKIVA_OBJECT_TYPE_PERSON)
         {
             person_count++;
+
+            if (result->objInfo[i].score > max_score)
+                max_score = result->objInfo[i].score;
         }
     }
 
@@ -266,6 +276,59 @@ static void detect_result_callback(
                    right,
                    bottom);
         }
+    }
+
+    if (detector->event_tracker_initialized)
+    {
+        memset(&event_input, 0, sizeof(event_input));
+        memset(&event_result, 0, sizeof(event_result));
+
+        event_input.frame_id = result->frameId;
+        event_input.timestamp_ms = callback_ms;
+        event_input.person_count = person_count;
+        event_input.max_score = max_score;
+
+        if (person_event_update(&detector->event_tracker,
+                                &event_input,
+                                &event_result) != 0)
+        {
+            fprintf(stderr,
+                    "[EVENT] update failed: frame_id=%u\n",
+                    result->frameId);
+            return;
+        }
+
+        if (event_result.event == PERSON_EVENT_ENTER ||
+            event_result.event == PERSON_EVENT_LEAVE)
+        {
+            pthread_mutex_lock(&detector->mutex);
+
+            if (event_result.event == PERSON_EVENT_ENTER)
+                detector->stats.enter_events++;
+            else
+                detector->stats.leave_events++;
+
+            pthread_mutex_unlock(&detector->mutex);
+        }
+
+        /*
+         * Integration-test logging: print every state-machine update,
+         * including NONE/IDLE, so we can verify that every RockIVA result
+         * reaches person_event_update().
+         */
+        printf("[EVENT] frame_id=%u event=%s state=%s "
+               "stable=%d event_id=%llu raw_person_count=%u "
+               "max_score=%u enter=%u/%u misses=%u\n",
+               event_result.frame_id,
+               person_event_type_string(event_result.event),
+               person_event_state_string(event_result.state),
+               event_result.person_present ? 1 : 0,
+               (unsigned long long)event_result.event_id,
+               event_result.person_count,
+               event_result.max_score,
+               event_result.enter_hits,
+               event_result.enter_samples,
+               event_result.consecutive_misses);
     }
 }
 
@@ -460,6 +523,7 @@ int live_person_detector_create(
     const LivePersonDetectorConfig *config)
 {
     LivePersonDetector *detector = NULL;
+    PersonEventConfig event_config;
     RockIvaInitParam init_param;
     RockIvaDetTaskParams det_param;
     RockIvaRetCode ret;
@@ -526,6 +590,16 @@ int live_person_detector_create(
         config->person_threshold;
     detector->slot_count = config->buffer_count;
     detector->next_frame_id = 1U;
+
+    person_event_default_config(&event_config);
+    if (person_event_init(&detector->event_tracker,
+                          &event_config) != 0)
+    {
+        fprintf(stderr, "[AI] person event tracker init failed\n");
+        free(detector);
+        return -1;
+    }
+    detector->event_tracker_initialized = 1;
 
     if (pthread_mutex_init(&detector->mutex, NULL) != 0)
     {
@@ -656,6 +730,11 @@ int live_person_detector_create(
            detector->slot_count);
     printf("[AI]   model file     : %s\n",
            model_file);
+    printf("[EVENT] entry rule    : %u-of-%u\n",
+           event_config.enter_required,
+           event_config.enter_window);
+    printf("[EVENT] leave rule    : %u consecutive misses\n",
+           event_config.leave_count);
 
     *out = detector;
     return 0;

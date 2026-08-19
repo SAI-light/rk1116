@@ -32,6 +32,8 @@ typedef struct
     uint64_t busy_skips;
     uint64_t result_callbacks;
     uint64_t person_positive_frames;
+    uint64_t enter_events;
+    uint64_t leave_events;
     uint64_t released_frames;
     uint64_t failed_results;
 } LivePersonDetectorStats;

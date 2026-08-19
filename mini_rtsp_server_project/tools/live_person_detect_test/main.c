@@ -562,13 +562,16 @@ int main(int argc, char **argv)
 
             printf("[status] captured=%llu sequence_gaps=%llu "
                    "AI_submitted=%llu AI_busy_skips=%llu "
-                   "AI_results=%llu person_frames=%llu\n",
+                   "AI_results=%llu person_frames=%llu "
+                   "ENTER=%llu LEAVE=%llu\n",
                    (unsigned long long)captured_frames,
                    (unsigned long long)sequence_gaps,
                    (unsigned long long)stats.submitted_frames,
                    (unsigned long long)stats.busy_skips,
                    (unsigned long long)stats.result_callbacks,
-                   (unsigned long long)stats.person_positive_frames);
+                   (unsigned long long)stats.person_positive_frames,
+                   (unsigned long long)stats.enter_events,
+                   (unsigned long long)stats.leave_events);
         }
     }
 
@@ -601,6 +604,10 @@ cleanup:
                (unsigned long long)stats.result_callbacks);
         printf("  person_positive_frames: %llu\n",
                (unsigned long long)stats.person_positive_frames);
+        printf("  enter_events          : %llu\n",
+               (unsigned long long)stats.enter_events);
+        printf("  leave_events          : %llu\n",
+               (unsigned long long)stats.leave_events);
         printf("  released_frames       : %llu\n",
                (unsigned long long)stats.released_frames);
         printf("  failed_results        : %llu\n",
