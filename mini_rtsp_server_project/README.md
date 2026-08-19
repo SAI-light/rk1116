@@ -1,326 +1,423 @@
-# mini_rtsp_server_project
+# Mini RTSP Server Project
 
-面向 Luckfox Pico Max（RV1106）的轻量级实时视频服务器。程序在板端完成摄像头采集、H.264 硬件编码、RTSP/RTP 推流和 MP4 同步录像：
+基于 **Luckfox Pico Max / Rockchip RV1106** 实现的嵌入式摄像头采集、H.264 硬件编码、RTSP/RTP 实时推流、MP4 同步录像与智能 PERSON 检测工程。
+
+项目采用模块化 C 语言设计，将摄像头采集、ISP、编码、H.264 解析、RTP、RTSP、SDP、MP4 Muxer 和智能事件检测拆分为独立模块，用于理解和实践嵌入式 Linux 多媒体系统完整数据链路。
+
+## 1. System Architecture
+
+当前主媒体链路：
 
 ```text
-/dev/video11（V4L2 MMAP，NV12）
-              ↓
-      RV1106 MPP/VENC
-              ↓
-     内存中的 H.264 Access Unit
-              ├──→ RTP/H.264 → RTSP → VLC
-              └──→ Rockchip RKMuxer → MP4
+                     SC3336
+                        │
+                        ▼
+                     RKAIQ
+                        │
+                        ▼
+              /dev/video11 / V4L2
+                        │
+                 2304×1296 NV12
+                        │
+                        ▼
+                Rockchip MPP
+                RV1106 VEPU
+                        │
+                        ▼
+                H.264 Access Unit
+                        │
+             ┌──────────┴──────────┐
+             │                     │
+             ▼                     ▼
+        RTP Packetizer          RKMuxer
+             │                     │
+       Single NALU / FU-A           ▼
+             │                    MP4
+             ▼
+         RTP over UDP
+             │
+             ▼
+         RTSP Session
+             │
+             ▼
+            VLC
 ```
 
-同一个 H.264 Access Unit 只编码一次，并在内存中分发给推流和录像模块；运行过程不生成中间 NV12 或裸 H.264 文件。
-
-## 当前状态
-
-核心链路已经完成并通过板端实测：
-
-| 模块 | 状态 | 验证结果 |
-|---|---|---|
-| V4L2 摄像头采集 | 已完成 | `/dev/video11`，2304×1296，NV12，多平面 API、单连续平面 |
-| MPP H.264 硬编码 | 已完成 | Constrained Baseline，25 fps，GOP 25，目标码率 4 Mbps |
-| RTP/H.264 | 已完成 | 单 NALU 与 FU-A 分片，90 kHz 时钟，帧增量 3600 |
-| RTSP 控制 | 已完成 | OPTIONS、DESCRIBE、SETUP、PLAY、GET_PARAMETER、TEARDOWN |
-| VLC 实时播放 | 已完成 | RTP over UDP 正常出画面 |
-| MP4 同步录像 | 已完成 | PLAY 后等待新 IDR，从同一 H.264 AU 实时写入 MP4 |
-| 安全退出 | 已实现 | `Ctrl+C`/SIGTERM 唤醒主循环、停止媒体线程并执行 `rkmuxer_deinit()` |
-| 日志系统 | 已实现 | ERROR、WARN、INFO、DEBUG 四级运行时日志 |
-
-最终联合验证记录见 [docs/VALIDATION.md](docs/VALIDATION.md)。
-
-## 已知限制
-
-当前版本定位为单路视频验证服务器：
-
-- 仅支持一个 RTSP 客户端；
-- RTP 使用 UDP，不支持 RTP over RTSP/TCP；
-- 不含音频和 RTCP 统计；
-- 视频参数暂固定为 2304×1296、25 fps、GOP 25、4 Mbps；
-- 摄像头驱动不接受 `VIDIOC_S_PARM` 时，程序继续使用驱动实际节拍，并以 25 fps 生成 RTP/MP4 时间轴。
-
-## 目录结构
+独立 AI 验证链路：
 
 ```text
-.
-├── common/
-│   └── log.c                  # 线程安全日志实现
-├── include/
-│   └── log.h                  # 日志接口与级别
-├── capture/
-│   ├── v4l2_capture.c
-│   └── v4l2_capture.h         # V4L2 MMAP NV12 采集
-├── encoder/
-│   ├── mpp_encoder.c
-│   └── mpp_encoder.h          # RV1106 厂商 Packet ABI 编码路径
-├── h264/
-│   ├── h264_annexb.c
-│   └── h264_annexb.h          # Annex-B NALU 拆分和 SPS/PPS/IDR 检测
-├── muxer/
-│   ├── mp4_muxer.c
-│   └── mp4_muxer.h            # librkmuxer MP4 封装
-├── rtp/
-│   ├── rtp_packet.c/.h        # RTP Header
-│   ├── h264_rtp.c/.h          # 单 NALU 与 FU-A
-│   └── rtp_sender.c/.h        # UDP 发送器
-├── rtsp/
-│   ├── rtsp_request.c/.h
-│   ├── rtsp_session.c/.h
-│   ├── rtsp_media.c/.h        # 实时媒体线程与 RTP/MP4 双分支
-│   └── rtsp_server.c/.h       # RTSP 服务器及安全停机
-├── sdp/
-│   ├── base64.c/.h
-│   └── sdp_builder.c/.h
-├── docs/
-│   └── VALIDATION.md          # 实测结果
-├── scripts/
-│   └── cleanup_worktree.sh    # 本地历史/调试文件清理工具
-├── main.c                     # 命令行和信号处理
+V4L2 2304×1296 NV12
+        │
+        ▼
+  DMA-backed Buffer
+        │
+        ▼
+     RockIVA
+        │
+     RGA Preprocess
+        │
+        ▼
+librknnmrt / RV1106 NPU
+        │
+        ▼
+  PFP PERSON Detection
+        │
+        ▼
+   person_event
+        │
+        ├── ENTER
+        ├── PRESENT
+        └── LEAVE
+```
+
+AI 检测未采用 OpenCV 作为核心推理框架，而是使用 Rockchip 平台提供的 **RockIVA + RGA + NPU** 硬件加速链路。
+
+## 2. Implemented Features
+
+### Camera & ISP
+
+* `/dev/video11` V4L2 Video Capture Multiplanar
+* NV12 图像格式
+* 2304×1296 分辨率
+* MMAP 多缓冲区连续采集
+* 实际采集约 30 fps
+* RKAIQ ISP 初始化、Prepare、Start、Stop、Deinit
+* SC3336 Sensor IQ 参数加载
+* 启动阶段丢弃约 30 帧完成曝光和 ISP 预热
+
+### H.264 Hardware Encoding
+
+基于 **Rockchip MPP / RV1106 VEPU**：
+
+* NV12 → H.264 硬件编码
+* 2304×1296 @ 30 fps
+* GOP 约 30
+* SPS / PPS 提取
+* IDR 与普通 NALU 解析
+* H.264 Access Unit 输出
+
+### RTSP
+
+自主实现基础 RTSP Server 流程，包括：
+
+```text
+OPTIONS
+DESCRIBE
+SETUP
+PLAY
+GET_PARAMETER
+TEARDOWN
+```
+
+DESCRIBE 阶段动态构建 H.264 SDP，并携带 SPS/PPS 参数。
+
+### RTP
+
+实现 RTP over UDP H.264 发送：
+
+* RTP sequence number
+* 90 kHz timestamp
+* SSRC
+* Marker bit
+* H.264 单 NALU Packet
+* H.264 FU-A 分片
+
+已通过 VLC 完成实时播放验证。
+
+### MP4 Recording
+
+基于 **RKMuxer** 对同一路 MPP H.264 Access Unit 进行 MP4 封装：
+
+```text
+MPP
+ │
+ ▼
+H.264 Access Unit
+ │
+ ├── RTP / RTSP
+ │
+ └── RKMuxer → MP4
+```
+
+已使用 `ffprobe` / `ffmpeg` 对录像进行帧率、帧数、时长以及完整解码验证。
+
+### RockIVA PERSON Detection
+
+通过独立工具 `tools/live_person_detect_test/` 完成实时 PERSON 检测链路：
+
+* RockIVA VIDEO 模式
+* PFP Detection Model
+* PERSON-only Object Filter
+* DMA-backed NV12 输入
+* 双 AI Buffer Slot
+* 异步 RockIVA Callback
+* AI 采样约 5 fps
+* 单次推理典型延迟约 39–40 ms
+* AI Buffer busy 时直接跳过采样，不阻塞 V4L2 视频采集
+
+静态 PERSON 测试已得到有效正向检测结果。
+
+实时摄像头链路能够稳定完成 RockIVA 推理与 Callback，但当前实际监控画面尚未获得稳定 PERSON 正检测样本，后续将重点验证摄像头画质、人物尺寸以及输入分辨率对检测结果的影响。
+
+### PERSON Event State Machine
+
+`event/person_event.c/.h` 将单帧 PERSON 检测结果转换为稳定业务事件。
+
+默认规则：
+
+```text
+ENTER：
+最近 3 次 AI 检测中至少 2 次检测到 PERSON
+
+LEAVE：
+连续 5 次 AI 检测未检测到 PERSON
+```
+
+状态包括：
+
+```text
+IDLE
+CANDIDATE
+PRESENT
+EXIT_PENDING
+```
+
+业务事件包括：
+
+```text
+NONE
+ENTER
+PRESENT
+LEAVE
+```
+
+该模块已完成独立单元测试，并已接入 `live_person_detect_test` 的实时 RockIVA Callback。
+
+## 3. Project Structure
+
+```text
+mini_rtsp_server_project/
+├── capture/               # V4L2 camera capture
+├── common/                # Common utilities / logging
+├── docs/                  # Project documents
+├── encoder/               # Rockchip MPP H.264 encoder
+├── event/                 # PERSON event state machine
+├── h264/                  # H.264 parsing / reader
+├── include/               # Common project headers
+├── isp/                   # RKAIQ ISP control
+├── muxer/                 # RKMuxer MP4 wrapper
+├── rtp/                   # RTP packetization / sender
+├── rtsp/                  # RTSP protocol / session
+├── scripts/               # Development / cleanup scripts
+├── sdp/                   # SDP generation / Base64
+│
+├── tests/
+│   ├── README.md
+│   └── integration/       # Cross-module integration tests
+│
+├── tools/
+│   ├── live_person_detect_test/
+│   ├── person_event_test/
+│   └── person_pet_detect_test/
+│
+├── main.c                 # Main application entry
 ├── Makefile
 ├── README.md
+├── CHANGELOG.md
 └── .gitignore
 ```
 
-## 环境与依赖
-
-### 开发主机
-
-- Ubuntu 24.04；
-- Luckfox Pico SDK；
-- 交叉编译器：`arm-rockchip830-linux-uclibcgnueabihf-gcc`。
-
-### 开发板
-
-- Luckfox Pico Max / RV1106；
-- ARMv7 / uClibc；
-- 运行库：
+部分模块级测试仍保留在对应模块目录中，例如：
 
 ```text
-/oem/usr/lib/librockchip_mpp.so.1
-/oem/usr/lib/librkmuxer.so
+capture/test_capture.c
+encoder/test_*.c
+rtp/test_*.c
+sdp/test_*.c
 ```
 
-### 默认依赖路径
-
-Makefile 默认使用：
+跨模块媒体链路测试统一整理至：
 
 ```text
-MPP_RELEASE=$HOME/boards/rk1116/sdk/luckfox-pico/media/mpp/
-            release_mpp_rv1106_arm-rockchip830-linux-uclibcgnueabihf
-BOARD_MPP_LIB=$HOME/boards/rk1116/mpp_board_abi
-RKMUXER_INCLUDE=$HOME/boards/rk1116/sdk/luckfox-pico/media/out/include
-RKMUXER_LIB=$HOME/boards/rk1116/rkmuxer_reference/lib
+tests/integration/
 ```
 
-路径不同可以在命令行覆盖。
+## 4. Build
 
-## 编译
-
-查看配置：
+推荐从仓库根目录：
 
 ```bash
-make print-config
-```
-
-编译 Release：
-
-```bash
-make clean
+cd ~/boards/rk1116
 make
 ```
 
-输出文件：
+也可以直接进入项目目录：
+
+```bash
+cd mini_rtsp_server_project
+make
+```
+
+清理：
+
+```bash
+make clean
+```
+
+成功编译后：
 
 ```text
 build/release/bin/mini_rtsp_server
 ```
 
-编译 Debug：
+程序应为 RV1106 对应 ARM/uClibc 可执行文件。
+
+可通过：
 
 ```bash
-make BUILD=debug
+file build/release/bin/mini_rtsp_server
 ```
 
-输出文件：
+检查目标架构。
+
+## 5. Runtime Verification
+
+主工程目前已经完成以下验证：
 
 ```text
-build/debug/bin/mini_rtsp_server
+V4L2 Camera Capture
+        ↓
+RKAIQ ISP
+        ↓
+MPP H.264 Encoding
+        ↓
+RTP / RTSP
+        ↓
+VLC Playback
 ```
 
-覆盖依赖路径示例：
-
-```bash
-make \
-  MPP_RELEASE=/path/to/mpp/release \
-  BOARD_MPP_LIB=/path/to/board/mpp/lib \
-  RKMUXER_INCLUDE=/path/to/rkmuxer/include \
-  RKMUXER_LIB=/path/to/rkmuxer/lib
-```
-
-其他目标：
-
-```bash
-make help
-make strip
-make clean
-```
-
-## 命令行
+同时：
 
 ```text
-Usage: mini_rtsp_server [options]
-
-  -p, --port PORT         RTSP TCP 端口，默认 8554
-  -d, --device PATH       V4L2 节点，默认 /dev/video11
-  -o, --record PATH       MP4 路径，默认 /root/live_record.mp4
-  -n, --no-record         只推流，不录像
-  -l, --log-level LEVEL   error、warn、info 或 debug
-  -h, --help              显示帮助
-  -V, --version           显示版本
+H.264 Access Unit
+        ↓
+RKMuxer
+        ↓
+MP4
+        ↓
+ffprobe / ffmpeg
 ```
 
-默认 INFO 日志只记录生命周期、连接、录像完成和性能汇总。DEBUG 会额外输出 RTSP 请求/回复、SDP、MPP Packet 和周期帧状态。
-
-## 板端运行
-
-先关闭系统自带的 `rkipc`，避免占用摄像头和 RTSP 端口：
-
-```bash
-killall rkipc 2>/dev/null
-```
-
-传输程序：
-
-```bash
-scp build/release/bin/mini_rtsp_server root@172.32.0.93:/root/
-```
-
-推流并同步录像：
-
-```bash
-cd /root
-chmod +x mini_rtsp_server
-
-LD_LIBRARY_PATH=/oem/usr/lib \
-./mini_rtsp_server \
-  --port 8554 \
-  --device /dev/video11 \
-  --record /root/live_record.mp4 \
-  --log-level info
-```
-
-只推流：
-
-```bash
-LD_LIBRARY_PATH=/oem/usr/lib \
-./mini_rtsp_server --no-record
-```
-
-VLC 打开：
+以及独立 AI 链路：
 
 ```text
-rtsp://172.32.0.93:8554/live
+V4L2
+  ↓
+RockIVA
+  ↓
+RV1106 NPU
+  ↓
+PERSON
+  ↓
+person_event
 ```
 
-VLC 需要使用 RTP over UDP，不要强制启用 RTP over RTSP/TCP。
+## 6. Engineering Design
 
-## 安全停止
+当前工程重点遵循：
 
-正常情况下，VLC 点击停止会发送 TEARDOWN，服务器随后关闭 RTP socket 并完成 MP4 索引。
+* 摄像头设备只由单一采集模块管理
+* 视频采集和 AI 推理采用不同处理节奏
+* AI 推理不能阻塞 30 fps 视频采集
+* 编码数据统一以 H.264 Access Unit 向 RTP 与 MP4 分发
+* 模块通过 `.c/.h` 接口隔离
+* 生成物统一放入 `build/`
+* 测试、工具、正式业务代码分别管理
+* Git 功能开发采用 feature branch + Pull Request 合并流程
 
-也可以在板端按：
+## 7. Known Limitations
+
+目前仍存在以下待验证问题：
+
+1. 当前实验室实时摄像头场景尚未稳定产生 PERSON 正检测结果；
+2. 需要进一步区分摄像头失焦/画面模糊、人物尺寸与 RockIVA 输入分辨率的影响；
+3. 当前 RockIVA/person_event 已在独立实时检测工具中接通，尚未正式并入主 `mini_rtsp_server` 数据链路；
+4. PERSON 事件目前尚未驱动自动录像和服务器上传。
+
+## 8. Roadmap
+
+### AI Input Optimization
+
+进行：
 
 ```text
-Ctrl+C
+2304×1296
+vs
+896×512
 ```
 
-程序的信号处理器只设置停止标志并写入自管道；实际资源释放在正常线程上下文中完成：
+PERSON 实时检测 A/B 对照实验。
+
+若低分辨率输入检测效果更好，则考虑正式设计：
 
 ```text
-SIGINT/SIGTERM
-      ↓
-唤醒 poll()/退出 RTSP 循环
-      ↓
-通知并 join 媒体线程
-      ↓
-关闭 RTP socket
-      ↓
-rkmuxer_deinit() 完成 MP4
-      ↓
-关闭 MPP、V4L2 和监听 socket
+                     V4L2 2304×1296
+                           │
+                  ┌────────┴────────┐
+                  │                 │
+                  ▼                 ▼
+                 MPP               RGA
+                  │                 │
+                  ▼                 ▼
+          H.264 / RTSP / MP4      896×512
+                                    │
+                                    ▼
+                                  RockIVA
+                                    │
+                                    ▼
+                                   NPU
 ```
 
-看到以下日志后再复制 MP4：
+### Event Recording
+
+将 `RockIVA + person_event` 正式接入主采集链路，并进一步实现：
 
 ```text
-[INFO] [muxer] closed: ...
-[INFO] [media] live MP4 recording finalized: ...
-[INFO] [rtsp] server stopped cleanly
+Continuous H.264
+       │
+       ▼
+Pre-record Ring Buffer
+       │
+ PERSON ENTER
+       │
+       ▼
+Pre-roll + Event + Post-roll
+       │
+       ▼
+      MP4
 ```
 
-不要使用 `kill -9`，因为 SIGKILL 无法执行 MP4 收尾。
+### System Integration
 
-## MP4 验证
+后续计划：
 
-```bash
-ffprobe \
-  -v error \
-  -count_frames \
-  -select_streams v:0 \
-  -show_entries \
-stream=codec_name,profile,width,height,avg_frame_rate,nb_read_frames:format=format_name,duration,size \
-  -of default=noprint_wrappers=1 \
-  live_record.mp4
-```
+* PIR 人体感应
+* 环境光检测
+* 自动补光
+* PERSON 事件录像
+* 本地录像文件管理
+* SFTP / HTTPS 后台上传
+* 上传失败重试
+* 磁盘空间管理
+* 开机自启动与异常恢复
+* 长时间稳定性测试
 
-完整解码检查：
+## 9. Development Status
 
-```bash
-ffmpeg -v error -i live_record.mp4 -f null -
-```
+当前阶段已经完成核心视频媒体链路和基础智能视觉链路验证。
 
-没有错误输出表示容器和视频帧可以完整解码。
+由于现阶段开发重点转向嵌入式 Linux、C/C++、网络、多媒体和项目面试准备，系统功能扩展暂时冻结；后续将继续完成 AI 输入优化、事件录像以及传感器/服务器侧集成。
 
-## 仓库规范
+更多历史变更参见：
 
-仓库应保留：
-
-- 当前正式 `.c/.h`；
-- Makefile、README、文档和脚本；
-- 必要的小型测试源码。
-
-不应提交：
-
-- 可执行文件、`.o/.d`；
-- MP4、H.264、NV12/YUV 和日志；
-- SDK、交叉工具链和板端动态库；
-- `*_before_*`、`.bak`、失败版源码和补丁中间文件；
-- 复制出来的 `stable_*` 快照目录。
-
-稳定状态使用 Git commit/tag 保存。清理本地历史调试文件前先预览：
-
-```bash
-./scripts/cleanup_worktree.sh
-```
-
-确认后执行：
-
-```bash
-./scripts/cleanup_worktree.sh --apply
-```
-
-## 后续可扩展方向
-
-- 多客户端会话和独立 RTP 状态；
-- RTP over RTSP/TCP；
-- RTCP Sender Report；
-- 音频采集与 A/V 同步；
-- 录像文件轮转和磁盘空间策略；
-- V4L2 DMABUF 到 MPP 的零拷贝；
-- systemd/启动脚本和健康检查。
-
-## License
-
-仓库尚未指定开源许可证。公开发布前应结合自研代码、Luckfox SDK 和 Rockchip 库的许可要求补充 `LICENSE`。
+**[CHANGELOG.md](CHANGELOG.md)**
